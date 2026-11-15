@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="SoundWich">
+<meta name="theme-color" content="#1c1c1e">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="favicon-32.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>SoundWich APP</title>
+<style>
+  html,body{margin:0;height:100%;background:#1c1c1e;color:#f2f2f7;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans",sans-serif;overflow:hidden}
+  #app{position:fixed;left:0;right:0;top:env(safe-area-inset-top);bottom:0;width:100%;height:calc(100% - env(safe-area-inset-top));border:0;display:block;background:#1c1c1e}
+  #gate{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:24px}
+  #gate.on{display:flex}
+  .box{width:min(320px,100%);text-align:center;animation:in .35s ease}
+  .box img{width:72px;height:72px;border-radius:16px;margin-bottom:18px}
+  .box h1{font-size:17px;font-weight:600;margin:0 0 6px}
+  .box p{font-size:13px;color:#8e8e93;margin:0 0 20px;line-height:1.6}
+  .box input{width:100%;box-sizing:border-box;font:inherit;font-size:16px;background:#2c2c2e;color:#f2f2f7;border:0;border-radius:10px;padding:12px 14px;outline:none;text-align:center;letter-spacing:.04em}
+  .box button{margin-top:12px;width:100%;font:inherit;font-size:16px;font-weight:600;background:#0a84ff;color:#fff;border:0;border-radius:10px;padding:12px;cursor:pointer}
+  .box .err{color:#ff453a;min-height:18px;margin:10px 0 0;font-size:13px}
+  @keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<div id="gate"><form class="box" id="f"><img src="apple-touch-icon.png" alt=""><h1>SoundWich APP</h1><p>この端末で初めて開くときだけ、<br>合言葉を入れてください</p><input id="k" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="合言葉"><button type="submit">開く</button><div class="err" id="err"></div></form></div>
+<script>
+  // アプリ本体（Google Apps Script）。この入口に埋め込むと、Googleの上の帯が出ない。中身は合言葉がないと何も出ない
+  const EXEC = 'https://script.google.com/macros/s/AKfycbyykA1rjK1J9a7nybAcciDsCOF5ME_V4oxsoD7IVfIZURtAfXunQNTovv-wMpmTFKgX/exec';
+  const S = { get(k) { try { return localStorage.getItem('swapp.' + k) || ''; } catch (e) { return ''; } }, set(k, v) { try { v ? localStorage.setItem('swapp.' + k, v) : localStorage.removeItem('swapp.' + k); } catch (e) { } } };
+  // リンクの # のあとに合言葉が付いていたら覚えて、アドレスからは消す
+  const h = new URLSearchParams(location.hash.slice(1));
+  if (h.get('k')) { S.set('k', h.get('k')); history.replaceState(null, '', location.pathname + location.search); }
+  let dev = S.get('d'); if (!dev) { dev = Array.from(crypto.getRandomValues(new Uint8Array(9)), b => b.toString(36).padStart(2, '0')).join('').slice(0, 14); S.set('d', dev); }
+  function open() {
+    const k = S.get('k'); if (!k) return gate('');
+    const q = new URLSearchParams(location.search), u = new URL(EXEC);
+    u.searchParams.set('k', k); u.searchParams.set('d', dev); if (q.get('id')) u.searchParams.set('id', q.get('id'));
+    let f = document.getElementById('app');
+    if (!f) { f = document.createElement('iframe'); f.id = 'app'; f.title = 'SoundWich APP'; f.allow = 'clipboard-read; clipboard-write'; document.body.appendChild(f); }
+    f.src = u.toString();
+    document.getElementById('gate').classList.remove('on');
+  }
+  function gate(msg) {
+    const f = document.getElementById('app'); if (f) f.remove();
+    document.getElementById('err').textContent = msg; document.getElementById('gate').classList.add('on');
+    setTimeout(() => document.getElementById('k').focus(), 50);
+  }
+  document.getElementById('f').addEventListener('submit', e => { e.preventDefault(); const v = document.getElementById('k').value.trim(); if (!v) return; S.set('k', v); document.getElementById('k').value = ''; open(); });
+  window.addEventListener('message', e => { if (e.data === 'swapp:badkey') { S.set('k', ''); gate('合言葉が違います'); } });
+  open();
+</script>
+</body>
+</html>
