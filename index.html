@@ -35,9 +35,9 @@
   // アプリ本体（Google Apps Script）。この入口に埋め込むと、Googleの上の帯が出ない。中身は合言葉がないと何も出ない
   const EXEC = 'https://script.google.com/macros/s/AKfycbyykA1rjK1J9a7nybAcciDsCOF5ME_V4oxsoD7IVfIZURtAfXunQNTovv-wMpmTFKgX/exec';
   const S = { get(k) { try { return localStorage.getItem('swapp.' + k) || ''; } catch (e) { return ''; } }, set(k, v) { try { v ? localStorage.setItem('swapp.' + k, v) : localStorage.removeItem('swapp.' + k); } catch (e) { } } };
-  // リンクの # のあとに合言葉が付いていたら覚えて、アドレスからは消す
+  // リンクの # のあとに合言葉が付いていたら覚える。ホーム画面に追加したアプリはSafariと保存場所が別なので、アドレスの # は消さずに残す（ホーム画面のアイコンに合言葉ごと入る）
   const h = new URLSearchParams(location.hash.slice(1));
-  if (h.get('k')) { S.set('k', h.get('k')); history.replaceState(null, '', location.pathname + location.search); }
+  if (h.get('k')) S.set('k', h.get('k'));
   let dev = S.get('d'); if (!dev) { dev = Array.from(crypto.getRandomValues(new Uint8Array(9)), b => b.toString(36).padStart(2, '0')).join('').slice(0, 14); S.set('d', dev); }
   function open() {
     const k = S.get('k'); if (!k) return gate('');

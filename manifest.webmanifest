@@ -1,1 +1,1 @@
-{"name":"SoundWich APP","short_name":"SoundWich","display":"standalone","background_color":"#1c1c1e","theme_color":"#1c1c1e","start_url":"./","icons":[{"src":"icon-192.png","sizes":"192x192","type":"image/png"},{"src":"icon-512.png","sizes":"512x512","type":"image/png"}]}
+{"name":"SoundWich APP","short_name":"SoundWich","display":"standalone","background_color":"#1c1c1e","theme_color":"#1c1c1e","icons":[{"src":"icon-192.png","sizes":"192x192","type":"image/png"},{"src":"icon-512.png","sizes":"512x512","type":"image/png"}]}
