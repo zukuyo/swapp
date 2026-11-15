@@ -41,11 +41,19 @@
   function open() {
     const k = S.get('k'); if (!k) return gate('');
     const q = new URLSearchParams(location.search), u = new URL(EXEC);
-    u.searchParams.set('k', k); u.searchParams.set('d', dev); if (q.get('id')) u.searchParams.set('id', q.get('id'));
+    u.searchParams.set('k', k); u.searchParams.set('d', dev); u.searchParams.set('ua', devName()); if (q.get('id')) u.searchParams.set('id', q.get('id'));
     let f = document.getElementById('app');
     if (!f) { f = document.createElement('iframe'); f.id = 'app'; f.title = 'SoundWich APP'; f.allow = 'clipboard-read; clipboard-write'; document.body.appendChild(f); }
     f.src = u.toString();
     document.getElementById('gate').classList.remove('on');
+  }
+  // 新しい端末の知らせに出す、端末のおおまかな種類（機種名までは分からない）
+  function devName() {
+    const a = navigator.userAgent, t = navigator.maxTouchPoints > 1;
+    const os = /iPhone/.test(a) ? 'iPhone' : /iPad/.test(a) || (/Macintosh/.test(a) && t) ? 'iPad' : /Android/.test(a) ? 'Android' : /Macintosh/.test(a) ? 'Mac' : /Windows/.test(a) ? 'Windows' : 'その他';
+    const br = /CriOS|Chrome/.test(a) ? 'Chrome' : /Firefox|FxiOS/.test(a) ? 'Firefox' : /Safari/.test(a) ? 'Safari' : '';
+    const home = (window.navigator.standalone || matchMedia('(display-mode: standalone)').matches) ? '・ホーム画面' : '';
+    return os + (br ? '・' + br : '') + home;
   }
   function gate(msg) {
     const f = document.getElementById('app'); if (f) f.remove();
