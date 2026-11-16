@@ -82,7 +82,9 @@
     setTimeout(() => document.getElementById('k').focus(), 50);
   }
   document.getElementById('f').addEventListener('submit', e => { e.preventDefault(); const v = document.getElementById('k').value.trim(); if (!v) return; S.set('k', v); document.getElementById('k').value = ''; open(); });
-  window.addEventListener('message', e => { if (e.data === 'swapp:ready') spOff(); if (e.data === 'swapp:badkey') { S.set('k', ''); gate('合言葉が違います'); } });
+  // 知らせはアプリ（Googleの画面）から来たものだけ受け付ける。ほかのページからの「合言葉が違う」で、覚えた合言葉を消されないように（2026-11-16 バグチェック）
+  const fromApp = o => /^https:\/\/([a-z0-9-]+\.)*(googleusercontent\.com|script\.google\.com)$/.test(String(o || ''));
+  window.addEventListener('message', e => { if (!fromApp(e.origin)) return; if (e.data === 'swapp:ready') spOff(); if (e.data === 'swapp:badkey') { S.set('k', ''); gate('合言葉が違います'); } });
   open();
 </script>
 </body>
