@@ -104,7 +104,7 @@
     b.addEventListener('click', () => {
       b.disabled = true; b.textContent = '開いています…'; er.textContent = '';
       // 問い合わせは、アプリの本体と同じく見えない枠で開き、結果を postMessage で受け取る（2026-11-19 iPhoneのSafariで fetch の答えが届かず赤い文字になったため）
-      const u = new URL(EXEC); u.searchParams.set('inv2', t); u.searchParams.set('ua', devName());
+      const u = new URL(EXEC); u.searchParams.set('inv2', t); u.searchParams.set('ua', devName()); u.searchParams.set('d', dev);
       const fr = document.createElement('iframe'); fr.style.display = 'none'; fr.title = '招待';
       let done = false;
       const onMsg = e => { if (!fromApp(e.origin) || !e.data || e.data.t !== 'swapp:inv') return; done = true; window.removeEventListener('message', onMsg); fr.remove(); got(e.data); };
@@ -112,7 +112,7 @@
       setTimeout(() => { if (done) return; window.removeEventListener('message', onMsg); fr.remove(); er.textContent = '通信できませんでした（時間切れ）。電波のよい所で、もう一度押してください'; b.disabled = false; b.textContent = '開く'; }, 40000);
       fr.src = u.toString(); document.body.appendChild(fr);
       function got(j) {
-        if (!j || !j.ok) { er.textContent = (j && j.msg) || '開けませんでした'; b.textContent = '開く'; return; }
+        if (!j || !j.ok) { er.textContent = (j && j.msg) || '開けませんでした'; b.textContent = '開く'; b.disabled = false; return; }
         S.set('k', j.k);
         // アドレスの # を合言葉に入れ替える（ホーム画面に追加したとき、アイコンに合言葉が入るように。今までの渡し方と同じ）
         const q = new URLSearchParams(location.search); q.delete('openExternalBrowser');
