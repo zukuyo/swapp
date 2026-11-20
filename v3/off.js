@@ -87,7 +87,7 @@
   function draw() {
     const old = P && Date.now() - P.at > 24 * 3600000;
     const head = '<div class="oh"><b>控え（見るだけ）</b>' + (READY ? '<span class="lk" id="offBack">アプリに戻る</span>' : '<span class="lk" id="offRe">つなぎ直す</span>') +
-      '<div class="at' + (old ? ' old' : '') + '">' + (P ? (old ? '古い控えです。' : '') + hm(P.at) + ' 時点の控え・' + (V.why === '圏外' ? 'ネットにつながっていません' : 'アプリが開かないので控えを出しています') : 'まだ控えがありません') + '</div></div>' +
+      '<div class="at' + (old ? ' old' : '') + '">' + (P ? (old ? '古い控えです。' : '') + hm(P.at) + ' 時点の控え・' + (V.why === '圏外' ? 'ネットにつながっていません' : V.why === '起動' ? '最新を読み込んでいます（準備ができたら切り替わります）' : 'アプリが開かないので控えを出しています') : 'まだ控えがありません') + '</div></div>' +
       '<div class="tabs"><span data-t="case" class="' + (V.tab === 'case' ? 'on' : '') + '">案件</span><span data-t="cal" class="' + (V.tab === 'cal' ? 'on' : '') + '">カレンダー</span><span data-t="file" class="' + (V.tab === 'file' ? 'on' : '') + '">ファイル ' + FILES.length + '</span></div>';
     let body = '';
     if (!P) body = '<div class="note">ネットがあるときにアプリを開くと、今日〜2週間先の案件の要点を、この端末に自動で取っておきます（30分ごと）。ファイルは、プレビューの「控えに入れる」で入れたものだけ入ります。</div>';
@@ -157,8 +157,10 @@
   function start() {
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
     if (!navigator.onLine) { show('圏外'); return; }
+    // 開いた直後は、アプリの準備ができるまで（Googleが画面を作る数秒）控えを先に見せる（2026-11-20 天田さん「たす」）。準備ができたら自動で本物に切り替わる
+    kvGet('pack').then(p => { if (p && !READY) show('起動'); }).catch(() => { });
     // 12秒たってもアプリが開かなければ、控えがある場合だけ出す（電波が弱いとき）。アプリが開いたら自動で消える
-    setTimeout(() => { if (!READY) kvGet('pack').then(p => { if (p && !READY) show('遅い'); }).catch(() => { }); }, 12000);
+    setTimeout(() => { if (!READY && el.classList.contains('on') && V.why === '起動') { V.why = '遅い'; draw(); } }, 12000); // 12秒たっても開かないときは、文言を「開かない」に
   }
   window.addEventListener('offline', () => { if (!el.classList.contains('on')) bar.classList.add('on'); });
   window.addEventListener('online', () => { bar.classList.remove('on'); if (el.classList.contains('on')) { V.why = '遅い'; draw(); } }); // 読んでいる途中で勝手に開き直さない。上の「つなぎ直す」で開く
