@@ -162,5 +162,5 @@
   }
   window.addEventListener('offline', () => { if (!el.classList.contains('on')) bar.classList.add('on'); });
   window.addEventListener('online', () => { bar.classList.remove('on'); if (el.classList.contains('on')) { V.why = '遅い'; draw(); } }); // 読んでいる途中で勝手に開き直さない。上の「つなぎ直す」で開く
-  window.SWOFF = { onMsg, start };
+  window.SWOFF = { onMsg, start, show }; // show：確かめる用（ネットがあっても控えを出す）
 })();
