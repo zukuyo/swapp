@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<title>SoundWich APP の確認</title>
+<style>
+  html,body{margin:0;height:100%;background:#1c1c1e;color:#f2f2f7;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans",sans-serif}
+  .box{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;gap:14px}
+  .box img{width:64px;height:64px;border-radius:14px}
+  .box p{margin:0;font-size:15px;line-height:1.7;max-width:320px}
+  .box .sub{font-size:13px;color:#8e8e93}
+  .box .ng{color:#ff6b6b}
+  .box button{font:inherit;font-size:15px;font-weight:600;background:#0a84ff;color:#fff;border:0;border-radius:10px;padding:10px 22px;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="box"><img src="../apple-touch-icon.png" alt=""><p id="m">確かめています…</p><p class="sub" id="s"></p><button id="b" style="display:none">閉じる</button></div>
+<script>
+  // ［そうする］をご本人のGoogleアカウントで書くための窓（2026-11-20 天田さん「押した人の名前で残す仕組みがいいよ」）。
+  // アプリが開いたこの窓で、Googleの許可（スプレッドシート・メールアドレス）を取り、その人の一時的な鍵（1時間で切れる）と整理券をアプリへ送る。
+  // 鍵はこの端末に1時間だけ取っておき、続けて押したときは許可の画面を出さずに使う。アプリ（Web.gs の otkUse_）が鍵の持ち主と宛先を確かめてから書く
+  const EXEC = 'https://script.google.com/macros/s/AKfycbxSB-wZdgOUeokFqoIKT4RjKyN3-roupbiJlbRINV0bdzMdXbmB8L8fuChSce2Jrvnd/exec';
+  const CLIENT = '39750626073-pih0kjhv4ukj87lh6fhbqha1npug2ah8.apps.googleusercontent.com';
+  const SCOPE = 'https://www.googleapis.com/auth/spreadsheets email';
+  const ME = location.origin + location.pathname;
+  const $ = id => document.getElementById(id);
+  const say = (m, s, bad) => { $('m').textContent = m; $('m').className = bad ? 'ng' : ''; $('s').textContent = s || ''; };
+  const done = () => { $('b').style.display = ''; $('b').onclick = () => window.close(); };
+  const keyOf = mail => 'swapp.otk.' + String(mail || '').toLowerCase();
+  const h = new URLSearchParams(location.hash.slice(1));
+  history.replaceState(null, '', location.pathname); // 鍵をアドレスに残さない
+  function send(tk, token, err) {
+    say(err ? '取りやめました' : '書いています…', err ? '' : 'この窓は閉じてもかまいません（書き込みは続きます）', !!err);
+    fetch(EXEC, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'v2otk', tk, token: token || '', err: err || '' }) })
+      .then(() => { if (!err) { say('送りました', 'アプリの画面に結果が出ます。この窓を閉じます'); setTimeout(() => window.close(), 1500); } done(); })
+      .catch(() => { say('送れませんでした', '通信が切れたかもしれません。アプリでもう一度押してください', true); done(); });
+  }
+  if (h.get('access_token') || h.get('error')) {
+    // Googleから戻ってきた
+    const st = String(h.get('state') || '').split('|'), tk = st[0] || '', mail = st[1] || '';
+    if (!/^[0-9a-f]{40}$/.test(tk)) { say('整理券が読めませんでした', 'アプリでもう一度押してください', true); done(); }
+    else if (h.get('error')) send(tk, '', h.get('error') === 'access_denied' ? '許可されませんでした' : h.get('error'));
+    else {
+      try { localStorage.setItem(keyOf(mail), JSON.stringify({ t: h.get('access_token'), exp: Date.now() + (Number(h.get('expires_in')) || 3600) * 1000 })); } catch (e) { }
+      send(tk, h.get('access_token'));
+    }
+  } else if (h.get('tk')) {
+    // アプリから開かれた：1時間以内の鍵があれば使い、なければGoogleの許可へ
+    const tk = h.get('tk'), mail = String(h.get('hint') || '').toLowerCase();
+    let c = null; try { c = JSON.parse(localStorage.getItem(keyOf(mail)) || 'null'); } catch (e) { }
+    const toGoogle = () => {
+      say('Googleに移ります…', mail ? mail + ' で確かめます' : '');
+      const u = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+      u.searchParams.set('client_id', CLIENT); u.searchParams.set('redirect_uri', ME); u.searchParams.set('response_type', 'token');
+      u.searchParams.set('scope', SCOPE); u.searchParams.set('include_granted_scopes', 'true'); u.searchParams.set('state', tk + '|' + mail);
+      if (mail) u.searchParams.set('login_hint', mail);
+      location.replace(u.toString());
+    };
+    // 取っておいた鍵は、まだ使えるか確かめてから使う（取り消されていたら、Googleの許可へ）
+    if (c && c.t && c.exp - Date.now() > 2 * 60000) fetch('https://oauth2.googleapis.com/tokeninfo?access_token=' + encodeURIComponent(c.t))
+      .then(r => r.ok ? r.json() : null).then(j => { if (j && String(j.email || '').toLowerCase() === mail) send(tk, c.t); else { try { localStorage.removeItem(keyOf(mail)); } catch (e) { } toGoogle(); } })
+      .catch(() => toGoogle());
+    else toGoogle();
+  } else { say('このページは、SoundWich APP から開いたときに使います', ''); done(); }
+</script>
+</body>
+</html>
