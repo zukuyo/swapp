@@ -137,7 +137,9 @@
   function homeHtml() {
     const cs = (P.cases || []).slice().sort((a, b) => (a.date || '9') < (b.date || '9') ? -1 : 1), t0 = ymd(0), t1 = ymd(1), t7 = ymd(7);
     const day = (lb, c) => '<div class="day" data-c="' + esc(c.id) + '"><em>' + lb + '</em><b>' + esc(c.title || c.subject || c.name) + '</b></div>';
-    const td = cs.filter(c => c.date === t0), tm = cs.filter(c => c.date === t1), wk = cs.filter(c => c.date && c.date > t1 && c.date <= t7);
+    // 何日も続く本番（11/15〜11/22 など）は、その間ずっと今日・明日・今週に出す（2026-11-21）
+    const last = c => c.dateTo && c.dateTo > c.date ? c.dateTo : c.date, on = (c, d) => c.date && c.date <= d && last(c) >= d;
+    const td = cs.filter(c => on(c, t0)), tm = cs.filter(c => on(c, t1) && !on(c, t0)), wk = cs.filter(c => c.date && c.date <= t7 && last(c) > t1 && !on(c, t0) && !on(c, t1));
     return '<div class="vt">' + esc(wd(t0)) + '</div><div class="hnt">控えにある分だけを出しています</div>' + td.map(c => day('今日', c)).join('') + tm.map(c => day('明日', c)).join('') +
       (!td.length && !tm.length ? '<div class="note">今日・明日の現場は、控えにありません</div>' : '') +
       '<h4>今週の現場</h4>' + (wk.map(c => '<div class="it" data-c="' + esc(c.id) + '"><div class="s">' + esc(wd(c.date)) + '</div><div class="t">' + esc(c.title || c.subject || c.name) + '</div><div class="s">' + esc([c.name, c.venue, c.status].filter(Boolean).join('・')) + '</div></div>').join('') || '<div class="note">ありません</div>');
@@ -194,7 +196,7 @@
   }
   function calHtml() {
     const by = {}; (P.sched || []).forEach(o => { (by[o.d] = by[o.d] || []).push(o); });
-    (P.cases || []).forEach(c => { if (c.date) (by[c.date] = by[c.date] || []).push({ d: c.date, res: '案件', t: c.title || c.name, c: c.id }); });
+    (P.cases || []).forEach(c => { if (!c.date) return; const e = c.dateTo && c.dateTo > c.date ? c.dateTo : c.date; for (let d = c.date, i = 0; d <= e && i < 15; i++) { (by[d] = by[d] || []).push({ d, res: '案件', t: c.title || c.name, c: c.id }); const x = new Date(d + 'T00:00:00+09:00'); x.setDate(x.getDate() + 1); d = x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); } }); // 何日も続く本番は毎日に
     const days = Object.keys(by).sort(); if (!days.length) return '<div class="note">2週間分の予定がありません</div>';
     return days.map(d => '<h4>' + esc(wd(d)) + (d === ymd(0) ? '・今日' : '') + '</h4>' + by[d].sort((a, b) => (a.res === '案件' ? -1 : 0) - (b.res === '案件' ? -1 : 0) || String(a.res).localeCompare(String(b.res)) || (a.h0 || 0) - (b.h0 || 0))
       .map(o => '<div class="it"' + (o.c ? ' data-c="' + esc(o.c) + '"' : ' style="cursor:default"') + '><div class="s">' + esc(o.res) + (o.all ? '・終日' : o.h0 != null ? '・' + hh(o.h0) + (o.h1 != null ? '〜' + hh(o.h1) : '') : '') + '</div><div class="t" style="font-weight:500">' + esc(o.t) + '</div></div>').join('')).join('');
