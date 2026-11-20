@@ -157,10 +157,9 @@
   function start() {
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
     if (!navigator.onLine) { show('圏外'); return; }
-    // 開いた直後は、アプリの準備ができるまで（Googleが画面を作る数秒）控えを先に見せる（2026-11-20 天田さん「たす」）。準備ができたら自動で本物に切り替わる
-    kvGet('pack').then(p => { if (p && !READY) show('起動'); }).catch(() => { });
-    // 12秒たってもアプリが開かなければ、控えがある場合だけ出す（電波が弱いとき）。アプリが開いたら自動で消える
-    setTimeout(() => { if (!READY && el.classList.contains('on') && V.why === '起動') { V.why = '遅い'; draw(); } }, 12000); // 12秒たっても開かないときは、文言を「開かない」に
+    // 開いた直後に控えを先に見せるのはやめた（2026-11-20 天田さん「この控えの時間なしでいいや、やっぱり起動画面に戻して」）。ふだんは今までの起動画面のまま。
+    // 電波が弱くて12秒たってもアプリが開かないときだけ、控えがあれば出す。アプリが開いたら自動で消える
+    setTimeout(() => { if (READY || el.classList.contains('on')) return; kvGet('pack').then(p => { if (p && !READY) show('遅い'); }).catch(() => { }); }, 12000);
   }
   window.addEventListener('offline', () => { if (!el.classList.contains('on')) bar.classList.add('on'); });
   window.addEventListener('online', () => { bar.classList.remove('on'); if (el.classList.contains('on')) { V.why = '遅い'; draw(); } }); // 読んでいる途中で勝手に開き直さない。上の「つなぎ直す」で開く
