@@ -65,11 +65,43 @@
 #offv .vh b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
 #offv iframe,#offv img{flex:1;width:100%;border:0;background:#fff;object-fit:contain}
 #offbar{position:fixed;left:50%;bottom:calc(76px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:3;background:#ff9f0a;color:#1c1c1e;font-weight:700;font-size:13.5px;padding:9px 16px;border-radius:999px;box-shadow:0 6px 18px rgba(0,0,0,.35);display:none;cursor:pointer;white-space:nowrap}
-#offbar.on{display:block}`;
+#offbar.on{display:block}
+/* ふだんのアプリと同じ枠で出す（2026-11-21 天田さん「控えの画面を基本通常の枠と画面で出る感じに。オフラインだと使えない機能は暗くして、控えてあるところは表示される」） */
+#off{flex-direction:row}
+#off .nv{flex:none;width:68px;background:#232325;display:flex;flex-direction:column;gap:2px;padding:calc(12px + env(safe-area-inset-top)) 6px 12px;overflow-y:auto;border-right:1px solid #38383a}
+#off .nv a{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 0 6px;border-radius:9px;color:#aeaeb2;font-size:10.5px;cursor:pointer;user-select:none;position:relative}
+#off .nv a svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+#off .nv a.on{background:rgba(79,179,176,.18);color:#5ac8c4}
+#off .nv a.na{opacity:.28;cursor:not-allowed}
+#off .nv a.na:after{content:'';position:absolute;top:7px;right:12px;width:7px;height:7px;border-radius:50%;border:1.5px solid #8e8e93}
+#off .nv a.set{margin-top:auto}
+#off .mn{flex:1;min-width:0;display:flex;flex-direction:column}
+#off .oh{background:#1c1c1e;border-bottom:1px solid #38383a}
+#off .oh .lg{width:28px;height:28px;border-radius:7px}
+#off .oh .ver{font-weight:400;color:#8e8e93}
+#off .oh .at{width:auto;flex-basis:100%;display:flex;align-items:center;gap:8px;color:#aeaeb2;font-size:12px}
+#off .oh .pill{white-space:nowrap;flex:none}
+#off .oh .pill{display:inline-block;background:rgba(255,159,10,.16);color:#ffb340;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600}
+#off .oh .at.old .pill{background:rgba(255,69,58,.18);color:#ff6961}
+#off .vt{font-size:20px;font-weight:700;margin:14px 0 4px}
+#off .hnt{font-size:12px;color:#8e8e93;margin:0 0 6px}
+#off .day{display:flex;gap:10px;align-items:center;background:#0f3d5e;border-radius:12px;padding:12px 14px;margin:8px 0;cursor:pointer}
+#off .day em{font-style:normal;background:#5ac8c4;color:#0b2233;font-weight:700;font-size:12px;border-radius:7px;padding:3px 8px;flex:none}
+#off .day b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#offtoast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:7;background:#3a3a3c;color:#f2f2f7;font-size:13px;padding:9px 16px;border-radius:999px;box-shadow:0 6px 18px rgba(0,0,0,.4);white-space:nowrap;pointer-events:none;transition:opacity .2s}
+@media (max-width:760px){
+  #off{flex-direction:column-reverse}
+  #off .nv{width:auto;flex-direction:row;overflow-x:auto;overflow-y:hidden;padding:6px 4px calc(6px + env(safe-area-inset-bottom));border-right:0;border-top:1px solid #38383a;gap:0;scrollbar-width:none}
+  #off .nv::-webkit-scrollbar{display:none}
+  #off .nv a{flex:0 0 calc(100% / 6);font-size:10px;padding:6px 0 4px}
+  #off .nv a.on{background:transparent}
+  #off .nv a.set{margin-top:0}
+  #off .ob{padding-bottom:24px}
+}`;
   const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
   const el = document.createElement('div'); el.id = 'off'; document.body.appendChild(el);
   const bar = document.createElement('div'); bar.id = 'offbar'; bar.textContent = 'ネットにつながっていません・控えを見る'; bar.onclick = () => show('圏外'); document.body.appendChild(bar);
-  let V = { tab: 'case', id: '', why: '' }, P = null, FILES = [];
+  let V = { tab: 'home', id: '', why: '', from: '' }, P = null, FILES = [];
   const wd = d => { try { const x = new Date(d + 'T00:00:00+09:00'); return (x.getMonth() + 1) + '/' + x.getDate() + '（' + '日月火水木金土'[x.getDay()] + '）'; } catch (e) { return d; } };
   const ymd = n => { const x = new Date(Date.now() + 9 * 3600000 + n * 86400000); return x.toISOString().slice(0, 10); };
   const hm = ms => { const x = new Date(ms); return (x.getMonth() + 1) + '/' + x.getDate() + ' ' + String(x.getHours()).padStart(2, '0') + ':' + String(x.getMinutes()).padStart(2, '0'); };
@@ -84,25 +116,51 @@
     });
   }
   function hide() { el.classList.remove('on'); bar.classList.remove('on'); const v = document.getElementById('offv'); if (v) v.remove(); }
+  // メニュー：アプリと同じ並び。控えで見られるもの（ホーム・カレンダー・案件・ファイル）だけ押せる。ほかは暗くして、押すと「ネットがないと使えません」
+  const NI = {
+    home: '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h5v-6h4v6h5V10"/>', time: '<rect x="3" y="5" width="18" height="15" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M7 14h4M13 17h4"/>',
+    todo: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/>', case: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12h18"/>',
+    inbox: '<path d="M4 13l2-8h12l2 8v6H4z"/><path d="M4 13h5l1 2h4l1-2h5"/>', form: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+    quote: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 12h7M9 16h7"/>', fix: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17v3h3l5.3-5.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/>',
+    file: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>', ppl: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.4"/><path d="M16 14.2c2.9.2 5 2.6 5 5.8"/>',
+    crm: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 14h18M9 4v16"/>', line: '<path d="M12 4C7 4 3 7.2 3 11.2c0 3.6 3.2 6.6 7.6 7.1l-.4 2.4c-.1.5.4.8.8.5l3.6-2.6c3.9-.9 6.4-3.8 6.4-7.4C21 7.2 17 4 12 4z"/>',
+    ig: '<rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/>', set: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>'
+  };
+  const OK_TABS = ['home', 'time', 'case', 'file'];
+  function navHtml() {
+    const boss = P && P.who === '天田';
+    const items = [['home', 'ホーム'], ['time', 'カレンダー'], ['todo', 'やること'], ['case', '案件'], ['inbox', '受信'], ['form', 'フォーム']].concat(boss ? [['quote', '見積'], ['fix', '修正指示']] : [], [['file', 'ファイル'], ['ppl', '人'], ['crm', 'CRM'], ['line', '公式LINE'], ['ig', 'インスタ'], ['set', '設定']]);
+    return '<nav class="nv">' + items.map(([k, l]) => { const ok = OK_TABS.indexOf(k) >= 0; return '<a data-t="' + k + '" class="' + (V.tab === k ? 'on' : '') + (ok ? '' : ' na') + (k === 'set' ? ' set' : '') + '"' + (ok ? '' : ' title="ネットがないと使えません"') + '><svg viewBox="0 0 24 24">' + NI[k] + '</svg><span>' + l + (k === 'file' && FILES.length ? ' ' + FILES.length : '') + '</span></a>'; }).join('') + '</nav>';
+  }
+  function offToast(t) { let x = document.getElementById('offtoast'); if (!x) { x = document.createElement('div'); x.id = 'offtoast'; document.body.appendChild(x); } x.textContent = t; x.style.opacity = '1'; clearTimeout(offToast.t); offToast.t = setTimeout(() => { x.style.opacity = '0'; }, 1800); }
+  function homeHtml() {
+    const cs = (P.cases || []).slice().sort((a, b) => (a.date || '9') < (b.date || '9') ? -1 : 1), t0 = ymd(0), t1 = ymd(1), t7 = ymd(7);
+    const day = (lb, c) => '<div class="day" data-c="' + esc(c.id) + '"><em>' + lb + '</em><b>' + esc(c.title || c.subject || c.name) + '</b></div>';
+    const td = cs.filter(c => c.date === t0), tm = cs.filter(c => c.date === t1), wk = cs.filter(c => c.date && c.date > t1 && c.date <= t7);
+    return '<div class="vt">' + esc(wd(t0)) + '</div><div class="hnt">控えにある分だけを出しています</div>' + td.map(c => day('今日', c)).join('') + tm.map(c => day('明日', c)).join('') +
+      (!td.length && !tm.length ? '<div class="note">今日・明日の現場は、控えにありません</div>' : '') +
+      '<h4>今週の現場</h4>' + (wk.map(c => '<div class="it" data-c="' + esc(c.id) + '"><div class="s">' + esc(wd(c.date)) + '</div><div class="t">' + esc(c.title || c.subject || c.name) + '</div><div class="s">' + esc([c.name, c.venue, c.status].filter(Boolean).join('・')) + '</div></div>').join('') || '<div class="note">ありません</div>');
+  }
   function draw() {
     const old = P && Date.now() - P.at > 24 * 3600000;
-    const head = '<div class="oh"><b>控え（見るだけ）</b>' + (READY ? '<span class="lk" id="offBack">アプリに戻る</span>' : '<span class="lk" id="offRe">つなぎ直す</span>') +
-      '<div class="at' + (old ? ' old' : '') + '">' + (P ? (old ? '古い控えです。' : '') + hm(P.at) + ' 時点の控え・' + (V.why === '圏外' ? 'ネットにつながっていません' : V.why === '起動' ? '最新を読み込んでいます（準備ができたら切り替わります）' : 'アプリが開かないので控えを出しています') : 'まだ控えがありません') + '</div></div>' +
-      '<div class="tabs"><span data-t="case" class="' + (V.tab === 'case' ? 'on' : '') + '">案件</span><span data-t="cal" class="' + (V.tab === 'cal' ? 'on' : '') + '">カレンダー</span><span data-t="file" class="' + (V.tab === 'file' ? 'on' : '') + '">ファイル ' + FILES.length + '</span></div>';
+    if (OK_TABS.indexOf(V.tab) < 0) V.tab = 'home';
+    const head = '<div class="oh"><img class="lg" src="../apple-touch-icon.png" alt=""><b>SoundWich <span class="ver">Ver3</span></b>' + (READY ? '<span class="lk" id="offBack">アプリに戻る</span>' : '<span class="lk" id="offRe">つなぎ直す</span>') +
+      '<div class="at' + (old ? ' old' : '') + '"><span class="pill">' + (P ? (old ? '古い控え・' : '控え・') + hm(P.at) + ' 時点' : 'まだ控えがありません') + '</span><span>' + (V.why === '圏外' ? 'ネットにつながっていません。見るだけで、書く・送るはできません' : V.why === '起動' ? '最新を読み込んでいます（準備ができたら切り替わります）' : 'アプリが開かないので控えを出しています') + '</span></div></div>';
     let body = '';
     if (!P) body = '<div class="note">ネットがあるときにアプリを開くと、今日〜2週間先の案件の要点を、この端末に自動で取っておきます（30分ごと）。ファイルは、プレビューの「控えに入れる」で入れたものだけ入ります。</div>';
     else if (V.tab === 'case' && V.id) body = caseHtml((P.cases || []).find(c => c.id === V.id) || {});
-    else if (V.tab === 'case') body = listHtml();
-    else if (V.tab === 'cal') body = calHtml();
-    else body = filesHtml(FILES);
-    el.innerHTML = head + '<div class="ob" id="offB">' + body + '</div>';
-    el.querySelector('.tabs').onclick = e => { const t = e.target.closest('[data-t]'); if (t) { V.tab = t.dataset.t; V.id = ''; draw(); } };
+    else if (V.tab === 'case') body = '<div class="vt">案件</div><div class="hnt">今日〜2週間先の案件と、控えに入れた案件</div>' + listHtml();
+    else if (V.tab === 'time') body = '<div class="vt">カレンダー</div><div class="hnt">2週間分（スケジュール帳と案件）</div>' + calHtml();
+    else if (V.tab === 'home') body = homeHtml();
+    else body = '<div class="vt">ファイル</div>' + filesHtml(FILES);
+    el.innerHTML = navHtml() + '<div class="mn">' + head + '<div class="ob" id="offB">' + body + '</div></div>';
+    el.querySelector('.nv').onclick = e => { const t = e.target.closest('[data-t]'); if (!t) return; if (t.classList.contains('na')) { offToast('ネットがないと使えません'); return; } V.tab = t.dataset.t; V.id = ''; draw(); };
     const bk = document.getElementById('offBack'); if (bk) bk.onclick = hide;
     const re = document.getElementById('offRe'); if (re) re.onclick = () => location.reload();
     document.getElementById('offB').onclick = e => {
-      const c = e.target.closest('[data-c]'); if (c) { V.tab = 'case'; V.id = c.dataset.c; draw(); document.getElementById('offB').scrollTop = 0; return; }
+      const c = e.target.closest('[data-c]'); if (c) { V.from = V.tab; V.tab = 'case'; V.id = c.dataset.c; draw(); document.getElementById('offB').scrollTop = 0; return; }
       const f = e.target.closest('[data-f]'); if (f) openFile(f.dataset.f);
-      if (e.target.closest('[data-back]')) { V.id = ''; draw(); }
+      if (e.target.closest('[data-back]')) { V.id = ''; if (V.from && V.from !== 'case') V.tab = V.from; V.from = ''; draw(); }
     };
   }
   function listHtml() {
@@ -120,7 +178,7 @@
     const cues = String(sh.tt || '').split(/\n+/).map(x => x.trim()).filter(Boolean).map(x => { const m = x.match(/^(\d{1,2}[:：]\d{2})\s*[〜~-]?\s*(.*)$/); return '<div class="cue"><b>' + esc(m ? m[1] : '') + '</b><span>' + esc(m ? m[2] : x) + '</span></div>'; }).join('');
     const mine = FILES.filter(f => f.caseId === c.id), mineIds = {}; mine.forEach(f => { mineIds[f.id] = 1; });
     const fid = u => (String(u || '').match(/[-\w]{25,}/) || [''])[0];
-    return '<p><span class="lk" data-back="1">‹ 案件の一覧</span></p><h4>' + esc(c.date ? wd(c.date) : '日にち未定') + '・' + esc(c.id) + '</h4>' +
+    return '<p><span class="lk" data-back="1">‹ 戻る</span></p><h4>' + esc(c.date ? wd(c.date) : '日にち未定') + '・' + esc(c.id) + '</h4>' +
       '<div style="font-size:19px;font-weight:700;margin:4px 0 10px">' + esc(c.title || c.subject || c.name) + '</div>' +
       '<div class="kv">' + row('お客さま', [c.name, c.company !== c.name ? c.company : ''].filter(Boolean).join('・')) + row('電話', (c.tels || []).join('\n'), true) + row('メール', c.mail) +
       row('会場', [c.venue, sh.addr || c.venueAddr].filter(Boolean).join('\n')) + row('状態', c.status) + '</div>' +
