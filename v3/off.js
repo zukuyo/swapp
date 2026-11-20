@@ -75,7 +75,8 @@
 #off .nv a.na{opacity:.28;cursor:not-allowed}
 #off .nv a.na:after{content:'';position:absolute;top:7px;right:12px;width:7px;height:7px;border-radius:50%;border:1.5px solid #8e8e93}
 #off .nv a.set{margin-top:auto}
-#off .mn{flex:1;min-width:0;display:flex;flex-direction:column}
+#off .mn{flex:1;min-width:0;min-height:0;overflow:hidden;display:flex;flex-direction:column}
+#off .oh{flex:none}
 #off .oh{background:#1c1c1e;border-bottom:1px solid #38383a}
 #off .oh .lg{width:28px;height:28px;border-radius:7px}
 #off .oh .ver{font-weight:400;color:#8e8e93}
