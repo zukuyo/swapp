@@ -90,7 +90,7 @@
   document.getElementById('f').addEventListener('submit', e => { e.preventDefault(); const v = document.getElementById('k').value.trim(); if (!v) return; S.set('k', v); document.getElementById('k').value = ''; open(); });
   // 知らせはアプリ（Googleの画面）から来たものだけ受け付ける。ほかのページからの「合言葉が違う」で、覚えた合言葉を消されないように（2026-11-16 バグチェック）
   const fromApp = o => /^https:\/\/([a-z0-9-]+\.)*(googleusercontent\.com|script\.google\.com)$/.test(String(o || ''));
-  window.addEventListener('message', e => { if (!fromApp(e.origin)) return; try { SWOFF.onMsg(e); } catch (er) { } if (e.data === 'swapp:ready') spOff(); if (e.data === 'swapp:badkey') { S.set('k', ''); gate('合言葉が違います'); } });
+  window.addEventListener('message', e => { if (!fromApp(e.origin)) return; try { SWOFF.onMsg(e); } catch (er) { } if (e.data === 'swapp:ready') spOff(); if (e.data === 'swapp:reload') { location.reload(); return; } /* 2026-11-20 直した知らせの「更新する」 */ if (e.data === 'swapp:badkey') { S.set('k', ''); gate('合言葉が違います'); } });
   // 1回だけ使える招待リンク（2026-11-19）：リンクの # のあとの i＝招待の番号。「開く」を押したときだけサーバーに問い合わせ、合言葉をこの端末に覚える。
   // LINEのプレビューや、ページを開いただけでは使われない。LINEの中の画面で開くと、そこに合言葉が入ってSafariでは開けなくなるので、LINEの中ではボタンを出さない
   // （送るリンクには ?openExternalBrowser=1 を付け、LINEから押すとSafariなどで開くようにしている）
