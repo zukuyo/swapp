@@ -87,11 +87,13 @@
   // ===== 2画面（2026-11-21）：アプリから 'swapp:split:画面' が来たら右半分にその画面だけのアプリを開く。'swapp:unsplit' で閉じる。開いていた画面と幅は覚える
   const SPLIT_MIN = 1000;
   function splitOpen(v) {
+    /* 'cases:K-000123' のように案件を付けると、右半分でその案件を開く（2026-11-21 右クリックの「右半分で開く」） */
+    let id = ''; const cm = String(v).match(/^([a-z]{2,10}):([A-Za-z0-9_-]{1,40})$/); if (cm) { v = cm[1]; id = cm[2]; }
     if (!/^[a-z]{2,10}$/.test(v) || window.innerWidth < SPLIT_MIN) return;
     const a = document.getElementById('app'); if (!a || !a.src) return;
     let f = document.getElementById('app2');
-    if (f && f.dataset.v === v) { splitClose(); return; } /* 同じ画面をもう一度選んだら閉じる */
-    const u = new URL(a.src); u.searchParams.set('solo', v); u.searchParams.delete('id');
+    if (f && f.dataset.v === v && !id) { splitClose(); return; } /* 同じ画面をもう一度選んだら閉じる */
+    const u = new URL(a.src); u.searchParams.set('solo', v); u.searchParams.delete('id'); if (id) u.searchParams.set('id', id);
     if (!f) { f = document.createElement('iframe'); f.id = 'app2'; f.title = 'SoundWich APP（右）'; f.allow = 'clipboard-read; clipboard-write'; document.body.appendChild(f); }
     f.dataset.v = v; f.src = u.toString();
     let b = document.getElementById('splitbar');
