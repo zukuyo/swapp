@@ -22,6 +22,9 @@
   #splitbar{position:fixed;top:0;bottom:0;left:var(--sl,55%);width:6px;background:#3a3a3c;cursor:col-resize;z-index:5}
   #splitbar:hover,#splitbar.on{background:#0a84ff}
   body.splitdrag iframe{pointer-events:none}
+  /* 右を閉じるボタンは、アプリの中に置くと画面のボタンに重なるので、境目の上（アプリの外）に置く */
+  #splitx{position:fixed;top:50%;left:calc(var(--sl,55%) - 9px);width:24px;height:24px;margin-top:-12px;border-radius:50%;background:#3a3a3c;color:#f2f2f7;border:2px solid #1c1c1e;font-size:14px;line-height:20px;text-align:center;cursor:pointer;z-index:6;box-sizing:border-box}
+  #splitx:hover{background:#0a84ff}
   #gate{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:24px}
   #gate.on{display:flex}
   #inv{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:24px}
@@ -90,11 +93,12 @@
     f.dataset.v = v; f.src = u.toString();
     let b = document.getElementById('splitbar');
     if (!b) { b = document.createElement('div'); b.id = 'splitbar'; b.title = 'ドラッグで幅を変える'; document.body.appendChild(b); splitDrag(b); }
+    if (!document.getElementById('splitx')) { const x = document.createElement('div'); x.id = 'splitx'; x.title = '右を閉じて1画面に戻す'; x.textContent = '×'; x.onclick = splitClose; document.body.appendChild(x); }
     const r = Number(S.get('splitr')); if (r >= 25 && r <= 75) document.documentElement.style.setProperty('--sl', r + '%');
     document.body.classList.add('split'); S.set('split', v);
   }
   function splitClose() {
-    ['app2', 'splitbar'].forEach(id => { const x = document.getElementById(id); if (x) x.remove(); });
+    ['app2', 'splitbar', 'splitx'].forEach(id => { const x = document.getElementById(id); if (x) x.remove(); });
     document.body.classList.remove('split'); S.set('split', '');
   }
   function splitDrag(b) {
@@ -105,7 +109,7 @@
       b.addEventListener('pointermove', mv); b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up);
     });
   }
-  window.addEventListener('resize', () => { if (window.innerWidth < SPLIT_MIN && document.getElementById('app2')) { document.getElementById('app2').remove(); const b = document.getElementById('splitbar'); if (b) b.remove(); document.body.classList.remove('split'); } });
+  window.addEventListener('resize', () => { if (window.innerWidth < SPLIT_MIN && document.getElementById('app2')) { document.getElementById('app2').remove(); ['splitbar', 'splitx'].forEach(id => { const b = document.getElementById(id); if (b) b.remove(); }); document.body.classList.remove('split'); } });
   // 新しい端末の知らせに出す、端末のおおまかな種類（機種名までは分からない）
   function devName() {
     const a = navigator.userAgent, t = navigator.maxTouchPoints > 1;
