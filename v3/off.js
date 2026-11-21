@@ -101,7 +101,7 @@
 }`;
   const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
   const el = document.createElement('div'); el.id = 'off'; document.body.appendChild(el);
-  const bar = document.createElement('div'); bar.id = 'offbar'; bar.textContent = 'ネットにつながっていません・控えを見る'; bar.onclick = () => show('圏外'); document.body.appendChild(bar);
+  const bar = document.createElement('div'); bar.id = 'offbar'; bar.textContent = 'ネットにつながっていません・オフライン保存を見る'; bar.onclick = () => show('圏外'); document.body.appendChild(bar);
   let V = { tab: 'home', id: '', why: '', from: '' }, P = null, FILES = [];
   const wd = d => { try { const x = new Date(d + 'T00:00:00+09:00'); return (x.getMonth() + 1) + '/' + x.getDate() + '（' + '日月火水木金土'[x.getDay()] + '）'; } catch (e) { return d; } };
   const ymd = n => { const x = new Date(Date.now() + 9 * 3600000 + n * 86400000); return x.toISOString().slice(0, 10); };
@@ -140,19 +140,19 @@
     // 何日も続く本番（11/15〜11/22 など）は、その間ずっと今日・明日・今週に出す（2026-11-21）
     const last = c => c.dateTo && c.dateTo > c.date ? c.dateTo : c.date, on = (c, d) => c.date && c.date <= d && last(c) >= d;
     const td = cs.filter(c => on(c, t0)), tm = cs.filter(c => on(c, t1) && !on(c, t0)), wk = cs.filter(c => c.date && c.date <= t7 && last(c) > t1 && !on(c, t0) && !on(c, t1));
-    return '<div class="vt">' + esc(wd(t0)) + '</div><div class="hnt">控えにある分だけを出しています</div>' + td.map(c => day('今日', c)).join('') + tm.map(c => day('明日', c)).join('') +
-      (!td.length && !tm.length ? '<div class="note">今日・明日の現場は、控えにありません</div>' : '') +
+    return '<div class="vt">' + esc(wd(t0)) + '</div><div class="hnt">オフライン保存した分だけを出しています</div>' + td.map(c => day('今日', c)).join('') + tm.map(c => day('明日', c)).join('') +
+      (!td.length && !tm.length ? '<div class="note">今日・明日の現場は、オフライン保存にありません</div>' : '') +
       '<h4>今週の現場</h4>' + (wk.map(c => '<div class="it" data-c="' + esc(c.id) + '"><div class="s">' + esc(wd(c.date)) + '</div><div class="t">' + esc(c.title || c.subject || c.name) + '</div><div class="s">' + esc([c.name, c.venue, c.status].filter(Boolean).join('・')) + '</div></div>').join('') || '<div class="note">ありません</div>');
   }
   function draw() {
     const old = P && Date.now() - P.at > 24 * 3600000;
     if (OK_TABS.indexOf(V.tab) < 0) V.tab = 'home';
     const head = '<div class="oh"><img class="lg" src="../apple-touch-icon.png" alt=""><b>SoundWich <span class="ver">Ver3</span></b>' + (READY ? '<span class="lk" id="offBack">アプリに戻る</span>' : '<span class="lk" id="offRe">つなぎ直す</span>') +
-      '<div class="at' + (old ? ' old' : '') + '"><span class="pill">' + (P ? (old ? '古い控え・' : '控え・') + hm(P.at) + ' 時点' : 'まだ控えがありません') + '</span><span>' + (V.why === '圏外' ? 'ネットにつながっていません。見るだけで、書く・送るはできません' : V.why === '起動' ? '最新を読み込んでいます（準備ができたら切り替わります）' : 'アプリが開かないので控えを出しています') + '</span></div></div>';
+      '<div class="at' + (old ? ' old' : '') + '"><span class="pill">' + (P ? (old ? '古いオフライン保存・' : 'オフライン保存・') + hm(P.at) + ' 時点' : 'まだオフライン保存がありません') + '</span><span>' + (V.why === '圏外' ? 'ネットにつながっていません。見るだけで、書く・送るはできません' : V.why === '起動' ? '最新を読み込んでいます（準備ができたら切り替わります）' : 'アプリが開かないので、オフライン保存した分を出しています') + '</span></div></div>';
     let body = '';
-    if (!P) body = '<div class="note">ネットがあるときにアプリを開くと、今日〜2週間先の案件の要点を、この端末に自動で取っておきます（30分ごと）。ファイルは、プレビューの「控えに入れる」で入れたものだけ入ります。</div>';
+    if (!P) body = '<div class="note">ネットがあるときにアプリを開くと、今日〜2週間先の案件の要点を、この端末に自動で取っておきます（30分ごと）。ファイルは、プレビューの「オフライン保存」で保存したものだけ入ります。</div>';
     else if (V.tab === 'case' && V.id) body = caseHtml((P.cases || []).find(c => c.id === V.id) || {});
-    else if (V.tab === 'case') body = '<div class="vt">案件</div><div class="hnt">今日〜2週間先の案件と、控えに入れた案件</div>' + listHtml();
+    else if (V.tab === 'case') body = '<div class="vt">案件</div><div class="hnt">今日〜2週間先の案件と、オフライン保存した案件</div>' + listHtml();
     else if (V.tab === 'time') body = '<div class="vt">カレンダー</div><div class="hnt">2週間分（スケジュール帳と案件）</div>' + calHtml();
     else if (V.tab === 'home') body = homeHtml();
     else body = '<div class="vt">ファイル</div>' + filesHtml(FILES);
@@ -174,7 +174,7 @@
       if (g !== last) { h += '<h4>' + esc(g) + '</h4>'; last = g; }
       h += '<div class="it" data-c="' + esc(c.id) + '"><div class="t">' + esc(c.title || c.subject || c.name) + '</div><div class="s">' + esc([c.name, c.company !== c.name ? c.company : '', c.venue, c.status].filter(Boolean).join('・')) + '</div></div>';
     });
-    return h || '<div class="note">控えに案件がありません</div>';
+    return h || '<div class="note">オフライン保存した案件がありません</div>';
   }
   function caseHtml(c) {
     const sh = c.sheet || {}, row = (k, v, tel) => v ? '<span>' + k + '</span><div>' + (tel ? telA(v) : esc(v)) + '</div>' : '';
@@ -190,8 +190,8 @@
       ((c.crew || []).length ? '<h4>人の手配</h4><div class="kv">' + c.crew.map(x => '<span>' + esc(x.role) + '</span><div>' + esc(x.who || '未定') + (x.st ? '（' + esc(x.st) + '）' : '') + '</div>').join('') + '</div>' : '') +
       (sh.gear ? '<h4>機材</h4><div class="msg">' + esc(sh.gear) + '</div>' : '') + (sh.note ? '<h4>そのほか</h4><div class="msg">' + esc(sh.note) + '</div>' : '') +
       (c.memo ? '<h4>社内メモ</h4><div class="msg">' + esc(c.memo) + '</div>' : '') + (c.summary ? '<h4>要約</h4><div class="msg">' + esc(c.summary) + '</div>' : '') +
-      '<h4>ファイル（控えに入れたものだけ開けます）</h4>' + (mine.map(f => '<div class="fl"><span>' + esc(f.name) + '</span><span class="lk" data-f="' + esc(f.id) + '" style="flex:none">開く</span></div>').join('') +
-        (c.files || []).filter(f => !mineIds[fid(f.url)]).map(f => '<div class="fl no"><span>' + esc(f.name) + '</span><small>控えにない</small></div>').join('') || '<div class="note">ファイルはありません</div>') +
+      '<h4>ファイル（オフライン保存したものだけ開けます）</h4>' + (mine.map(f => '<div class="fl"><span>' + esc(f.name) + '</span><span class="lk" data-f="' + esc(f.id) + '" style="flex:none">開く</span></div>').join('') +
+        (c.files || []).filter(f => !mineIds[fid(f.url)]).map(f => '<div class="fl no"><span>' + esc(f.name) + '</span><small>保存していません</small></div>').join('') || '<div class="note">ファイルはありません</div>') +
       ((c.msgs || []).length ? '<h4>最後のやりとり（' + c.msgs.length + '通）</h4>' + c.msgs.slice().reverse().map(m => '<div class="msg ' + (m.dir === 'R' ? 'R' : '') + '"><small>' + esc(String(m.at || '').replace('T', ' ').slice(5, 16)) + '　' + esc(m.via) + (m.who ? '　' + esc(m.who) : '') + '</small>' + esc(m.text) + '</div>').join('') : '');
   }
   function calHtml() {
@@ -202,7 +202,7 @@
       .map(o => '<div class="it"' + (o.c ? ' data-c="' + esc(o.c) + '"' : ' style="cursor:default"') + '><div class="s">' + esc(o.res) + (o.all ? '・終日' : o.h0 != null ? '・' + hh(o.h0) + (o.h1 != null ? '〜' + hh(o.h1) : '') : '') + '</div><div class="t" style="font-weight:500">' + esc(o.t) + '</div></div>').join('')).join('');
   }
   function filesHtml(fs) {
-    if (!fs.length) return '<div class="note">控えに入れたファイルはありません。ネットがあるときに、ファイルのプレビューの上の「控えに入れる」を押すと入ります。</div>';
+    if (!fs.length) return '<div class="note">オフライン保存したファイルはありません。ネットがあるときに、ファイルのプレビューの上の「オフライン保存」を押すと入ります。</div>';
     const nm = id => ((P && P.cases || []).find(c => c.id === id) || {}).title || id;
     return fs.sort((a, b) => b.at - a.at).map(f => '<div class="fl"><span>' + esc(f.name) + '<br><small style="color:#8e8e93">' + esc(nm(f.caseId)) + '</small></span><span class="lk" data-f="' + esc(f.id) + '" style="flex:none">開く</span></div>').join('');
   }
