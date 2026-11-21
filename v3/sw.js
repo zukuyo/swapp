@@ -1,6 +1,6 @@
 // 見るだけの控え（2026-11-20）：ネットがないときも、この入口のページ（と控えを出す off.js）が開けるように取っておく。
 // いつもはネットから読み（5秒で返らなければ取っておいた分）、ネットがなければ取っておいた分を出す。アプリ本体（Googleの画面）はここでは扱わない
-const C = 'swapp-v3-off-2';
+const C = 'swapp-v3-off-3';
 const FILES = ['./', './off.js', '../apple-touch-icon.png', '../favicon-32.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(C).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== C).map(k => caches.delete(k)))).then(() => self.clients.claim())); });

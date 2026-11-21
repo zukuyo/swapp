@@ -4,13 +4,24 @@
 (function () {
   const DB = 'swapp-off', esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   let dbp = null;
-  const db = () => dbp || (dbp = new Promise((ok, ng) => { const r = indexedDB.open(DB, 1); r.onupgradeneeded = () => { r.result.createObjectStore('kv'); r.result.createObjectStore('files', { keyPath: 'id' }); }; r.onsuccess = () => ok(r.result); r.onerror = () => ng(r.error); }));
+  // 2：案件の画面の写し（snaps）を足した（2026-11-21 天田さん「オフラインでもこの画面の情報は全て保存されてて、おなじ表示形式でみれるように」）
+  const db = () => dbp || (dbp = new Promise((ok, ng) => { const r = indexedDB.open(DB, 2); r.onupgradeneeded = () => { const d = r.result, has = n => d.objectStoreNames.contains(n); if (!has('kv')) d.createObjectStore('kv'); if (!has('files')) d.createObjectStore('files', { keyPath: 'id' }); if (!has('snaps')) d.createObjectStore('snaps', { keyPath: 'id' }); }; r.onsuccess = () => ok(r.result); r.onerror = () => ng(r.error); }));
   const tx = (st, mode, fn) => db().then(d => new Promise((ok, ng) => { const t = d.transaction(st, mode), s = t.objectStore(st); const r = fn(s); t.oncomplete = () => ok(r && r.result); t.onerror = () => ng(t.error); }));
   const kvGet = k => tx('kv', 'readonly', s => s.get(k));
   const kvPut = (k, v) => tx('kv', 'readwrite', s => s.put(v, k));
   const fAll = () => tx('files', 'readonly', s => s.getAll());
   const fPut = f => tx('files', 'readwrite', s => s.put(f));
   const fDel = id => tx('files', 'readwrite', s => s.delete(id));
+  const sAll = () => tx('snaps', 'readonly', s => s.getAll());
+  const sPut = x => tx('snaps', 'readwrite', s => s.put(x));
+  const sDel = id => tx('snaps', 'readwrite', s => s.delete(id));
+  // 外れた案件（本番の7日後・オフライン保存をやめた）の写しとファイルを、この端末から消す。アプリが渡す ids（保存する案件の全部）にないものだけ
+  function prune(ids) {
+    if (!Array.isArray(ids) || !ids.length) return;
+    const keep = {}; ids.forEach(x => { keep[x] = 1; });
+    sAll().then(ss => (ss || []).forEach(x => { if (!keep[x.id]) sDel(x.id).catch(() => { }); })).catch(() => { });
+    fAll().then(fs => (fs || []).forEach(f => { if (f.caseId && !keep[f.caseId]) fDel(f.id).catch(() => { }); })).catch(() => { });
+  }
   const b64Blob = (b64, mime) => { const bin = atob(b64), a = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return new Blob([a], { type: mime || 'application/octet-stream' }); };
 
   // ===== アプリからの知らせ =====
@@ -20,15 +31,18 @@
     if (d === 'swapp:ready') { READY = true; if (el.classList.contains('on') && V.why === '遅い') draw(); else hide(); sendInfo(e.source, e.origin); return; } // 控えを読んでいる途中なら、急に消さず「アプリに戻る」を出す
     if (!d || typeof d !== 'object') return;
     const reply = m => { try { e.source.postMessage(m, e.origin); } catch (er) { } };
-    if (d.t === 'swapp:pack' && d.pack) kvPut('pack', d.pack).catch(() => { });
+    if (d.t === 'swapp:pack' && d.pack) { kvPut('pack', d.pack).catch(() => { }); prune(d.pack.ids); }
+    if (d.t === 'swapp:css' && d.css) kvPut('css', { css: String(d.css), html: String(d.html || ''), body: String(d.body || ''), at: Date.now() }).catch(() => { });
+    if (d.t === 'swapp:snap' && d.id && d.html) sPut({ id: String(d.id), html: String(d.html), at: d.at || Date.now() }).catch(() => { });
     if (d.t === 'swapp:file' && d.file && d.file.id) {
       const f = d.file;
-      fPut({ id: f.id, caseId: f.caseId || '', name: f.name || '', mime: f.mime || '', at: f.at || Date.now(), blob: b64Blob(f.data, f.mime) })
+      /* 大きいファイルは、アプリが分けて読んで Blob にしてから渡す（2026-11-21 天田さん「大きかろうと保存する方向に」） */
+      fPut({ id: f.id, caseId: f.caseId || '', name: f.name || '', mime: f.mime || '', at: f.at || Date.now(), blob: f.blob instanceof Blob ? f.blob : b64Blob(f.data, f.mime) })
         .then(() => reply({ t: 'swapp:filesaved', id: f.id, name: f.name })).catch(er => reply({ t: 'swapp:fileerr', id: f.id, msg: '端末に入りませんでした（空きが足りないかもしれません）' }));
     }
     if (d.t === 'swapp:filedel' && d.id) fDel(d.id).then(() => reply({ t: 'swapp:filegone', id: d.id })).catch(() => { });
   }
-  function sendInfo(src, origin) { fAll().then(fs => { try { src.postMessage({ t: 'swapp:offinfo', files: fs.map(f => ({ id: f.id, name: f.name, caseId: f.caseId })) }, origin); } catch (e) { } }).catch(() => { }); }
+  function sendInfo(src, origin) { Promise.all([fAll(), sAll().catch(() => [])]).then(([fs, ss]) => { try { src.postMessage({ t: 'swapp:offinfo', files: fs.map(f => ({ id: f.id, name: f.name, caseId: f.caseId })), snaps: (ss || []).map(x => ({ id: x.id, at: x.at })) }, origin); } catch (e) { } }).catch(() => { }); }
 
   // ===== 見せる =====
   const css = `
@@ -90,6 +104,9 @@
 #off .day em{font-style:normal;background:#5ac8c4;color:#0b2233;font-weight:700;font-size:12px;border-radius:7px;padding:3px 8px;flex:none}
 #off .day b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #offtoast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:7;background:#3a3a3c;color:#f2f2f7;font-size:13px;padding:9px 16px;border-radius:999px;box-shadow:0 6px 18px rgba(0,0,0,.4);white-space:nowrap;pointer-events:none;transition:opacity .2s}
+#off .ob.snap{padding:0;display:flex;flex-direction:column;overflow:hidden}
+#off .snapbar{flex:none;display:flex;gap:12px;align-items:center;padding:8px 16px;font-size:12px;color:#aeaeb2;border-bottom:1px solid #38383a}
+#off .snapf{flex:1;width:100%;border:0;background:#fff;min-height:0}
 @media (max-width:760px){
   #off{flex-direction:column-reverse}
   #off .nv{width:auto;flex-direction:row;overflow-x:auto;overflow-y:hidden;padding:6px 4px calc(6px + env(safe-area-inset-bottom));border-right:0;border-top:1px solid #38383a;gap:0;scrollbar-width:none}
@@ -102,7 +119,7 @@
   const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
   const el = document.createElement('div'); el.id = 'off'; document.body.appendChild(el);
   const bar = document.createElement('div'); bar.id = 'offbar'; bar.textContent = 'ネットにつながっていません・オフライン保存を見る'; bar.onclick = () => show('圏外'); document.body.appendChild(bar);
-  let V = { tab: 'home', id: '', why: '', from: '' }, P = null, FILES = [];
+  let V = { tab: 'home', id: '', why: '', from: '' }, P = null, FILES = [], SNAPS = {}, CSS = null;
   const wd = d => { try { const x = new Date(d + 'T00:00:00+09:00'); return (x.getMonth() + 1) + '/' + x.getDate() + '（' + '日月火水木金土'[x.getDay()] + '）'; } catch (e) { return d; } };
   const ymd = n => { const x = new Date(Date.now() + 9 * 3600000 + n * 86400000); return x.toISOString().slice(0, 10); };
   const hm = ms => { const x = new Date(ms); return (x.getMonth() + 1) + '/' + x.getDate() + ' ' + String(x.getHours()).padStart(2, '0') + ':' + String(x.getMinutes()).padStart(2, '0'); };
@@ -110,8 +127,8 @@
   const hh = h => h == null ? '' : String(Math.floor(h)).padStart(2, '0') + ':' + String(Math.round((h % 1) * 60)).padStart(2, '0');
   function show(why) {
     V.why = why || V.why;
-    Promise.all([kvGet('pack').catch(() => null), fAll().catch(() => [])]).then(([p, fs]) => {
-      P = p; FILES = fs || []; el.classList.add('on'); bar.classList.remove('on');
+    Promise.all([kvGet('pack').catch(() => null), fAll().catch(() => []), sAll().catch(() => []), kvGet('css').catch(() => null)]).then(([p, fs, ss, cs]) => {
+      P = p; FILES = fs || []; SNAPS = {}; (ss || []).forEach(x => { SNAPS[x.id] = x; }); CSS = cs; el.classList.add('on'); bar.classList.remove('on');
       const s = document.getElementById('sp'); if (s) s.remove();
       draw();
     });
@@ -150,13 +167,16 @@
     const head = '<div class="oh"><img class="lg" src="../apple-touch-icon.png" alt=""><b>SoundWich <span class="ver">Ver3</span></b>' + (READY ? '<span class="lk" id="offBack">アプリに戻る</span>' : '<span class="lk" id="offRe">つなぎ直す</span>') +
       '<div class="at' + (old ? ' old' : '') + '"><span class="pill">' + (P ? (old ? '古いオフライン保存・' : 'オフライン保存・') + hm(P.at) + ' 時点' : 'まだオフライン保存がありません') + '</span><span>' + (V.why === '圏外' ? 'ネットにつながっていません。見るだけで、書く・送るはできません' : V.why === '起動' ? '最新を読み込んでいます（準備ができたら切り替わります）' : 'アプリが開かないので、オフライン保存した分を出しています') + '</span></div></div>';
     let body = '';
-    if (!P) body = '<div class="note">ネットがあるときにアプリを開くと、今日〜2週間先の案件の要点を、この端末に自動で取っておきます（30分ごと）。ファイルは、プレビューの「オフライン保存」で保存したものだけ入ります。</div>';
+    const snap = V.tab === 'case' && V.id && SNAPS[V.id] && CSS ? SNAPS[V.id] : null;
+    if (snap) body = '<div class="snapbar"><span class="lk" data-back="1">‹ 戻る</span><span>アプリと同じ画面の写し・' + esc(hm(snap.at)) + ' 時点。見るだけです</span></div><iframe class="snapf" id="offSnap" title="案件の画面"></iframe>';
+    else if (!P) body ='<div class="note">ネットがあるときにアプリを開くと、今日〜2週間先の案件の要点を、この端末に自動で取っておきます（30分ごと）。ファイルは、プレビューの「オフライン保存」で保存したものだけ入ります。</div>';
     else if (V.tab === 'case' && V.id) body = caseHtml((P.cases || []).find(c => c.id === V.id) || {});
     else if (V.tab === 'case') body = '<div class="vt">案件</div><div class="hnt">今日〜2週間先の案件と、オフライン保存した案件</div>' + listHtml();
     else if (V.tab === 'time') body = '<div class="vt">カレンダー</div><div class="hnt">2週間分（スケジュール帳と案件）</div>' + calHtml();
     else if (V.tab === 'home') body = homeHtml();
     else body = '<div class="vt">ファイル</div>' + filesHtml(FILES);
-    el.innerHTML = navHtml() + '<div class="mn">' + head + '<div class="ob" id="offB">' + body + '</div></div>';
+    el.innerHTML = navHtml() + '<div class="mn">' + head + '<div class="ob' + (snap ? ' snap' : '') + '" id="offB">' + body + '</div></div>';
+    if (snap) mountSnap(snap);
     el.querySelector('.nv').onclick = e => { const t = e.target.closest('[data-t]'); if (!t) return; if (t.classList.contains('na')) { offToast('ネットがないと使えません'); return; } V.tab = t.dataset.t; V.id = ''; draw(); };
     const bk = document.getElementById('offBack'); if (bk) bk.onclick = hide;
     const re = document.getElementById('offRe'); if (re) re.onclick = () => location.reload();
@@ -164,6 +184,28 @@
       const c = e.target.closest('[data-c]'); if (c) { V.from = V.tab; V.tab = 'case'; V.id = c.dataset.c; draw(); document.getElementById('offB').scrollTop = 0; return; }
       const f = e.target.closest('[data-f]'); if (f) openFile(f.dataset.f);
       if (e.target.closest('[data-back]')) { V.id = ''; if (V.from && V.from !== 'case') V.tab = V.from; V.from = ''; draw(); }
+    };
+  }
+  // アプリの案件の画面を、アプリの見た目（CSS）ごと枠の中に出す。中の仕掛け（ボタンの動き）は外してあるので見るだけ。
+  // ファイルの札は、この端末に保存したものだけ開ける（保存していないものは薄く出し、押すと知らせる）
+  const SNAP_FIX = 'html,body{height:100%;margin:0;overflow:hidden}.app{display:block!important;height:100%!important;width:100%!important;grid-template-columns:none!important}.app>.side,.app>.gut,.tolatest,.toasts{display:none!important}' +
+    '.main{display:flex!important;flex-direction:column;height:100%!important;width:100%!important;max-width:none!important}.rp,.newbar,.ed,.cmtb,.use,.vtools,.edl,.back,#f-status:empty{display:none!important}.gut{pointer-events:none}' +
+    'a.file.offno{opacity:.42}a.file.offok .pvw:after{content:"保存済み";position:absolute;left:4px;top:4px;background:#34c759;color:#fff;font-size:10px;font-weight:700;border-radius:5px;padding:1px 5px}a.file .pvw{position:relative}';
+  function mountSnap(s) {
+    const f = document.getElementById('offSnap'); if (!f) return;
+    const saved = {}; FILES.forEach(x => { saved[x.id] = 1; });
+    f.srcdoc = '<!doctype html><html' + (CSS.html ? ' ' + CSS.html : '') + '><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>' + CSS.css.replace(/<\/style/gi, '') + '</style><style>' + SNAP_FIX + '</style></head><body' + (CSS.body ? ' class="' + esc(CSS.body) + '"' : '') + '><div class="app detail" id="app"><main class="main" id="main">' + s.html + '</main></div></body></html>';
+    f.onload = () => {
+      let doc; try { doc = f.contentDocument; } catch (e) { return; } if (!doc) return;
+      doc.querySelectorAll('a.file[data-fpv]').forEach(a => a.classList.add(saved[a.dataset.fpv] ? 'offok' : 'offno'));
+      doc.addEventListener('click', e => {
+        const a = e.target.closest('a'); if (!a) return; e.preventDefault(); e.stopPropagation();
+        const id = a.dataset.fpv;
+        if (id) { if (saved[id]) openFile(id); else offToast('このファイルはオフライン保存していません'); return; }
+        const h = a.getAttribute('href') || '';
+        if (/^tel:|^mailto:/.test(h)) { location.href = h; return; }
+        if (/^https?:/.test(h)) { if (navigator.onLine) window.open(h, '_blank', 'noopener'); else offToast('ネットがないと開けません'); }
+      }, true);
     };
   }
   function listHtml() {
