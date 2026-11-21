@@ -16,6 +16,12 @@
 <style>
   html,body{overscroll-behavior-x:none;margin:0;height:100%;background:#1c1c1e;color:#f2f2f7;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans",sans-serif;overflow:hidden}
   #app{position:fixed;left:0;right:0;top:env(safe-area-inset-top);bottom:0;width:100%;height:calc(100% - env(safe-area-inset-top));border:0;display:block;background:#1c1c1e}
+  /* 2画面（2026-11-21 天田さん「右半分に開いて2画面で見たい」）：左が今のアプリ、右がもう1つのアプリ（一覧なし・その画面だけ）。境目はドラッグで動かす */
+  body.split #app{right:auto;width:var(--sl,55%)}
+  #app2{position:fixed;top:env(safe-area-inset-top);bottom:0;right:0;left:calc(var(--sl,55%) + 6px);width:auto;height:calc(100% - env(safe-area-inset-top));border:0;display:block;background:#1c1c1e}
+  #splitbar{position:fixed;top:0;bottom:0;left:var(--sl,55%);width:6px;background:#3a3a3c;cursor:col-resize;z-index:5}
+  #splitbar:hover,#splitbar.on{background:#0a84ff}
+  body.splitdrag iframe{pointer-events:none}
   #gate{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:24px}
   #gate.on{display:flex}
   #inv{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:24px}
@@ -70,7 +76,36 @@
     if (!f) { f = document.createElement('iframe'); f.id = 'app'; f.title = 'SoundWich APP'; f.allow = 'clipboard-read; clipboard-write'; f.addEventListener('load', () => setTimeout(spOff, 15000)); document.body.appendChild(f); }
     f.src = u.toString();
     document.getElementById('gate').classList.remove('on');
+    const sv = S.get('split'); if (sv) setTimeout(() => splitOpen(sv), 1500); /* 2画面で閉じていたら、右も開き直す */
   }
+  // ===== 2画面（2026-11-21）：アプリから 'swapp:split:画面' が来たら右半分にその画面だけのアプリを開く。'swapp:unsplit' で閉じる。開いていた画面と幅は覚える
+  const SPLIT_MIN = 1000;
+  function splitOpen(v) {
+    if (!/^[a-z]{2,10}$/.test(v) || window.innerWidth < SPLIT_MIN) return;
+    const a = document.getElementById('app'); if (!a || !a.src) return;
+    let f = document.getElementById('app2');
+    if (f && f.dataset.v === v) { splitClose(); return; } /* 同じ画面をもう一度選んだら閉じる */
+    const u = new URL(a.src); u.searchParams.set('solo', v); u.searchParams.delete('id');
+    if (!f) { f = document.createElement('iframe'); f.id = 'app2'; f.title = 'SoundWich APP（右）'; f.allow = 'clipboard-read; clipboard-write'; document.body.appendChild(f); }
+    f.dataset.v = v; f.src = u.toString();
+    let b = document.getElementById('splitbar');
+    if (!b) { b = document.createElement('div'); b.id = 'splitbar'; b.title = 'ドラッグで幅を変える'; document.body.appendChild(b); splitDrag(b); }
+    const r = Number(S.get('splitr')); if (r >= 25 && r <= 75) document.documentElement.style.setProperty('--sl', r + '%');
+    document.body.classList.add('split'); S.set('split', v);
+  }
+  function splitClose() {
+    ['app2', 'splitbar'].forEach(id => { const x = document.getElementById(id); if (x) x.remove(); });
+    document.body.classList.remove('split'); S.set('split', '');
+  }
+  function splitDrag(b) {
+    b.addEventListener('pointerdown', e => {
+      e.preventDefault(); b.classList.add('on'); document.body.classList.add('splitdrag'); b.setPointerCapture && b.setPointerCapture(e.pointerId);
+      const mv = ev => { const r = Math.max(25, Math.min(75, ev.clientX / window.innerWidth * 100)); document.documentElement.style.setProperty('--sl', r.toFixed(1) + '%'); S.set('splitr', r.toFixed(1)); };
+      const up = () => { b.classList.remove('on'); document.body.classList.remove('splitdrag'); b.removeEventListener('pointermove', mv); b.removeEventListener('pointerup', up); b.removeEventListener('pointercancel', up); };
+      b.addEventListener('pointermove', mv); b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up);
+    });
+  }
+  window.addEventListener('resize', () => { if (window.innerWidth < SPLIT_MIN && document.getElementById('app2')) { document.getElementById('app2').remove(); const b = document.getElementById('splitbar'); if (b) b.remove(); document.body.classList.remove('split'); } });
   // 新しい端末の知らせに出す、端末のおおまかな種類（機種名までは分からない）
   function devName() {
     const a = navigator.userAgent, t = navigator.maxTouchPoints > 1;
@@ -90,7 +125,7 @@
   document.getElementById('f').addEventListener('submit', e => { e.preventDefault(); const v = document.getElementById('k').value.trim(); if (!v) return; S.set('k', v); document.getElementById('k').value = ''; open(); });
   // 知らせはアプリ（Googleの画面）から来たものだけ受け付ける。ほかのページからの「合言葉が違う」で、覚えた合言葉を消されないように（2026-11-16 バグチェック）
   const fromApp = o => /^https:\/\/([a-z0-9-]+\.)*(googleusercontent\.com|script\.google\.com)$/.test(String(o || ''));
-  window.addEventListener('message', e => { if (!fromApp(e.origin)) return; try { SWOFF.onMsg(e); } catch (er) { } if (e.data === 'swapp:ready') spOff(); if (e.data === 'swapp:reload') { location.reload(); return; } /* 2026-11-20 直した知らせの「更新する」 */ if (e.data === 'swapp:badkey') { S.set('k', ''); gate('合言葉が違います'); } });
+  window.addEventListener('message', e => { if (!fromApp(e.origin)) return; try { SWOFF.onMsg(e); } catch (er) { } if (e.data === 'swapp:ready') spOff(); if (e.data === 'swapp:reload') { location.reload(); return; } /* 2026-11-20 直した知らせの「更新する」 */ if (e.data === 'swapp:badkey') { S.set('k', ''); gate('合言葉が違います'); } if (typeof e.data === 'string' && e.data.indexOf('swapp:split:') === 0) splitOpen(e.data.slice(12)); if (e.data === 'swapp:unsplit') splitClose(); });
   // 1回だけ使える招待リンク（2026-11-19）：リンクの # のあとの i＝招待の番号。「開く」を押したときだけサーバーに問い合わせ、合言葉をこの端末に覚える。
   // LINEのプレビューや、ページを開いただけでは使われない。LINEの中の画面で開くと、そこに合言葉が入ってSafariでは開けなくなるので、LINEの中ではボタンを出さない
   // （送るリンクには ?openExternalBrowser=1 を付け、LINEから押すとSafariなどで開くようにしている）
