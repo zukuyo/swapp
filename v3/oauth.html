@@ -24,7 +24,7 @@
   // 鍵はこの端末に1時間だけ取っておき、続けて押したときは許可の画面を出さずに使う。アプリ（Web.gs の otkUse_）が鍵の持ち主と宛先を確かめてから書く
   const EXEC = 'https://script.google.com/macros/s/AKfycbxSB-wZdgOUeokFqoIKT4RjKyN3-roupbiJlbRINV0bdzMdXbmB8L8fuChSce2Jrvnd/exec';
   const CLIENT = '39750626073-pih0kjhv4ukj87lh6fhbqha1npug2ah8.apps.googleusercontent.com';
-  const SCOPES = { '': 'https://www.googleapis.com/auth/spreadsheets email', meet: 'https://www.googleapis.com/auth/meetings.space.created email' }; // meet＝本人のアカウントでMeetを作る（2026-11-20）
+  const SCOPES = { '': 'https://www.googleapis.com/auth/spreadsheets email', meet: 'https://www.googleapis.com/auth/meetings.space.created email', cal: 'https://www.googleapis.com/auth/calendar.events email' }; // meet＝本人のアカウントでMeetを作る（2026-11-20）／cal＝本人のカレンダーに予定とMeetを作る（2026-11-24）
   const ME = location.origin + location.pathname;
   const $ = id => document.getElementById(id);
   const say = (m, s, bad) => { $('m').textContent = m; $('m').className = bad ? 'ng' : ''; $('s').textContent = s || ''; };
@@ -39,7 +39,7 @@
       .catch(() => { say('送れませんでした', '通信が切れたかもしれません。アプリでもう一度押してください', true); done(); });
   }
   // スプレッドシートの許可が入っているか（Googleの許可の画面では、項目ごとのチェックを外せる。外すと鍵はできるが書けない）
-  const hasSheets = (s, sc) => sc === 'meet' ? /meetings\.space\.created/.test(String(s || '')) : /\/auth\/spreadsheets(\s|$)/.test(String(s || '')); // Meetのときは、Meetを作る許可があるか
+  const hasSheets = (s, sc) => sc === 'cal' ? /auth\/calendar\.events/.test(String(s || '')) : sc === 'meet' ? /meetings\.space\.created/.test(String(s || '')) : /\/auth\/spreadsheets(\s|$)/.test(String(s || '')); // Meetのときは、Meetを作る許可があるか
   // again＝true：もう一度、許可の画面を必ず出す（チェックを入れ直してもらうため）
   const toGoogle = (tk, mail, again, sc) => {
     say('Googleに移ります…', mail ? mail + ' で確かめます' : '');
@@ -58,7 +58,7 @@
     else if (h.get('scope') && !hasSheets(h.get('scope'), sc)) {
       // スプレッドシートのチェックが外れていた（2026-11-20 梅木さん「スプレッドシートの権限がありません」）。この鍵は取っておかず、送らない
       try { localStorage.removeItem(keyOf(mail, sc)); } catch (e) { }
-      say(sc === 'meet' ? 'Meetを作る許可にチェックが入っていませんでした' : 'スプレッドシートの許可にチェックが入っていませんでした', '下のボタンでGoogleの画面をもう一度開き、「Google スプレッドシート」の行にチェックを入れて「続行」を押してください（まだ書いていません）', true);
+      say(sc === 'cal' ? 'カレンダーの許可にチェックが入っていませんでした' : sc === 'meet' ? 'Meetを作る許可にチェックが入っていませんでした' : 'スプレッドシートの許可にチェックが入っていませんでした', '下のボタンでGoogleの画面をもう一度開き、' + (sc === 'cal' ? '「Google カレンダー」' : sc === 'meet' ? '「Google Meet」' : '「Google スプレッドシート」') + 'の行にチェックを入れて「続行」を押してください（まだ書いていません）', true);
       $('b').textContent = 'もう一度Googleへ'; $('b').style.display = ''; $('b').onclick = () => toGoogle(tk, mail, true, sc);
     }
     else {
