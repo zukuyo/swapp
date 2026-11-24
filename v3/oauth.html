@@ -41,19 +41,21 @@
   // スプレッドシートの許可が入っているか（Googleの許可の画面では、項目ごとのチェックを外せる。外すと鍵はできるが書けない）
   const hasSheets = (s, sc) => sc === 'cal' ? /auth\/calendar\.events/.test(String(s || '')) : sc === 'meet' ? /meetings\.space\.created/.test(String(s || '')) : /\/auth\/spreadsheets(\s|$)/.test(String(s || '')); // Meetのときは、Meetを作る許可があるか
   // again＝true：もう一度、許可の画面を必ず出す（チェックを入れ直してもらうため）
-  const toGoogle = (tk, mail, again, sc) => {
+  // silent＝true：まず許可の画面を出さずに鍵をもらう（prompt=none）。許可がすでにあれば、画面は出ずに戻ってくる。画面が要るときだけ、普通の許可に切り替える（2026-11-24 天田さん「梅木さんの許可が何回かに一回出る」）
+  const toGoogle = (tk, mail, again, sc, silent) => {
     say('Googleに移ります…', mail ? mail + ' で確かめます' : '');
     const u = new URL('https://accounts.google.com/o/oauth2/v2/auth');
     u.searchParams.set('client_id', CLIENT); u.searchParams.set('redirect_uri', ME); u.searchParams.set('response_type', 'token');
-    u.searchParams.set('scope', SCOPES[sc || '']); u.searchParams.set('include_granted_scopes', 'true'); u.searchParams.set('state', tk + '|' + mail + '|' + (sc || ''));
+    u.searchParams.set('scope', SCOPES[sc || '']); u.searchParams.set('include_granted_scopes', 'true'); u.searchParams.set('state', tk + '|' + mail + '|' + (sc || '') + (silent && !again ? '|n' : ''));
     if (mail) u.searchParams.set('login_hint', mail);
-    if (again) u.searchParams.set('prompt', 'consent');
+    if (again) u.searchParams.set('prompt', 'consent'); else if (silent) u.searchParams.set('prompt', 'none');
     location.replace(u.toString());
   };
   if (h.get('access_token') || h.get('error')) {
     // Googleから戻ってきた
     const st = String(h.get('state') || '').split('|'), tk = st[0] || '', mail = st[1] || '', sc = SCOPES[st[2]] ? st[2] || '' : '';
     if (!/^[0-9a-f]{40}$/.test(tk)) { say('整理券が読めませんでした', 'アプリでもう一度押してください', true); done(); }
+    else if (h.get('error') && st[3] === 'n' && /login_required|consent_required|interaction_required|account_selection_required/.test(h.get('error'))) toGoogle(tk, mail, false, sc, false); // 静かに取れなかった：普通の許可の画面へ
     else if (h.get('error')) send(tk, '', h.get('error') === 'access_denied' ? '許可されませんでした' : h.get('error'));
     else if (h.get('scope') && !hasSheets(h.get('scope'), sc)) {
       // スプレッドシートのチェックが外れていた（2026-11-20 梅木さん「スプレッドシートの権限がありません」）。この鍵は取っておかず、送らない
@@ -71,9 +73,9 @@
     let c = null; try { c = JSON.parse(localStorage.getItem(keyOf(mail, sc)) || 'null'); } catch (e) { }
     // 取っておいた鍵は、まだ使えるか・スプレッドシートの許可があるかを確かめてから使う（足りなければ捨てて、Googleの許可へ）
     if (c && c.t && c.exp - Date.now() > 2 * 60000) fetch('https://oauth2.googleapis.com/tokeninfo?access_token=' + encodeURIComponent(c.t))
-      .then(r => r.ok ? r.json() : null).then(j => { if (j && String(j.email || '').toLowerCase() === mail && hasSheets(j.scope, sc)) send(tk, c.t); else { try { localStorage.removeItem(keyOf(mail, sc)); } catch (e) { } toGoogle(tk, mail, !!j, sc); } })
-      .catch(() => toGoogle(tk, mail, false, sc));
-    else toGoogle(tk, mail, false, sc);
+      .then(r => r.ok ? r.json() : null).then(j => { if (j && String(j.email || '').toLowerCase() === mail && hasSheets(j.scope, sc)) send(tk, c.t); else { try { localStorage.removeItem(keyOf(mail, sc)); } catch (e) { } toGoogle(tk, mail, !!j, sc, !j); } })
+      .catch(() => toGoogle(tk, mail, false, sc, true));
+    else toGoogle(tk, mail, false, sc, true);
   } else { say('このページは、SoundWich APP から開いたときに使います', ''); done(); }
 </script>
 </body>
