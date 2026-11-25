@@ -81,40 +81,38 @@
 <script>
   // アプリ本体（Google Apps Script）。この入口に埋め込むと、Googleの上の帯が出ない。中身は合言葉がないと何も出ない
   const EXEC = 'https://script.google.com/macros/s/AKfycbxSB-wZdgOUeokFqoIKT4RjKyN3-roupbiJlbRINV0bdzMdXbmB8L8fuChSce2Jrvnd/exec';
-  /* 起動画面：白・青・黄色の玉が回りながら弧に伸び縮みし、準備ができたら勢いよく線に吸い込まれてロゴになる（2026-11-26 天田さん。試作3の「3 シュッと」）。
-     玉→線は回る勢いを引き継いでなめらかに減速（かくつかせない）。線＝白は三角の辺、青・黄は棒。緑は青から分かれて出る。そろったらすぐ大きく抜けて消える */
-  const SPX = (() => {
-    const sv = document.getElementById('spLg'); if (!sv || !window.requestAnimationFrame) return null;
-    const TAU = Math.PI * 2, C = 512, R = 487, BALL = 91, N = 40, SPIN = TAU / 0.7, MAXS = 83.5 / 180 * Math.PI, OFF = [0, -.47, -.93];
+  /* 起動画面：白・青・黄色の玉が回りながら弧に伸び縮み → 弧がまっすぐの線に吸い込まれてロゴになる → また玉に戻って回る、を待っている間くり返す（2026-11-26 天田さん「3で」）。
+     準備ができた瞬間に消す（2026-11-26 天田さん「このアニメーションで遅くなることは論外。呼吸するロゴのときと比べて長くなってはいけない」）。動きを見せるために待たせない */
+  (() => {
+    const sv = document.getElementById('spLg'); if (!sv || !window.requestAnimationFrame) return;
+    const TAU = Math.PI * 2, C = 512, R = 487, BALL = 91, N = 40, SPIN = TAU / 0.7, MAXS = 83.5 / 180 * Math.PI, OFF = [0, -.47, -.93], L = 2.0;
     const TGT = [{ a: [132, 416], b: [890, 176], w: 28 }, { a: [155, 475], b: [867, 475], w: 46 }, { a: [155, 599], b: [449, 599], w: 46 }];
-    const D = .30, KEEP = 1.3, FLING = .22, PARTS = .16, EXIT = .42;
     const g = id => document.getElementById(id), P = [g('spP0'), g('spP1'), g('spP2')];
     const cl = (x, a, b) => Math.max(a === undefined ? 0 : a, Math.min(b === undefined ? 1 : b, x)), sst = u => u * u * (3 - 2 * u), o3 = u => 1 - Math.pow(1 - u, 3), o5 = u => 1 - Math.pow(1 - u, 5);
     const io4 = u => u < .5 ? 8 * u * u * u * u : 1 - Math.pow(-2 * u + 2, 4) / 2;
     const sweep = (t, i) => { const ph = ((t + OFF[i] + 14) % 1.4) / 1.4, h = ph < .5 ? ph * 2 : 2 - ph * 2; return MAXS * sst(h) + .0001; };
     const arc = (tail, sw, rr) => { const a = []; for (let j = 0; j < N; j++) { const q = tail + sw * j / (N - 1); a.push([C + rr * Math.cos(q), C + rr * Math.sin(q)]); } return a; };
     const dd = p => 'M' + p.map(x => x[0].toFixed(1) + ' ' + x[1].toFixed(1)).join('L');
-    const t0 = performance.now(); let rt = -1, th = [], sw = [], cb = null, fired = false;
+    const t0 = performance.now();
     function f(now) {
-      if (!document.getElementById('sp')) return;
-      const t = (now - t0) / 1000, pop = o3(cl(t / .25));
-      if (rt < 0) { for (let i = 0; i < 3; i++) { P[i].setAttribute('d', dd(arc(t * SPIN + i * TAU / 3, sweep(t, i), R))); P[i].setAttribute('stroke-width', BALL * pop); } requestAnimationFrame(f); return; }
-      if (!th.length) for (let i = 0; i < 3; i++) { th[i] = rt * SPIN + i * TAU / 3; sw[i] = Math.max(sweep(rt, i), .25); }
-      const m = t - rt, u = cl(m / D), e = io4(u);
+      if (!document.getElementById('sp')) return;  /* 消えたら止める */
+      const t = (now - t0) / 1000, pop = o3(cl(t / .25)), c = t % L;
+      /* 1周期2秒：0〜0.95秒 回る → 0.95〜1.25秒 線に吸い込まれる → 〜1.7秒 ロゴ → 〜2.0秒 玉に戻る */
+      const e = c < .95 ? 0 : c < 1.25 ? io4((c - .95) / .3) : c < 1.7 ? 1 : 1 - io4((c - 1.7) / .3);
+      const fl = c >= .95 && c < 1.25 ? .22 * Math.sin(Math.PI * cl((c - .95) / .3 * 1.6)) : 0;
       for (let i = 0; i < 3; i++) {
-        const tail = th[i] + SPIN * D * KEEP * (u - u * u / 2), rr = R * (1 + FLING * Math.sin(Math.PI * cl(u * 1.6))), T = TGT[i];
-        P[i].setAttribute('d', dd(arc(tail, sw[i], rr).map((p, j) => { const fr = j / (N - 1), x = T.a[0] + (T.b[0] - T.a[0]) * fr, y = T.a[1] + (T.b[1] - T.a[1]) * fr; return [p[0] + (x - p[0]) * e, p[1] + (y - p[1]) * e]; })));
+        const T = TGT[i], A = arc(t * SPIN + i * TAU / 3, Math.max(sweep(t, i), e > 0 ? .25 : 0), R * (1 + fl));
+        P[i].setAttribute('d', dd(e ? A.map((p, j) => { const fr = j / (N - 1), x = T.a[0] + (T.b[0] - T.a[0]) * fr, y = T.a[1] + (T.b[1] - T.a[1]) * fr; return [p[0] + (x - p[0]) * e, p[1] + (y - p[1]) * e]; }) : A));
         P[i].setAttribute('stroke-width', (BALL + (T.w - BALL) * e) * Math.max(pop, .001));
       }
-      const k = m - D * .75;
-      g('spTri').setAttribute('opacity', cl(k / (PARTS * .5))); P[0].style.opacity = 1 - cl((k - PARTS * .3) / (PARTS * .3));
-      const gg = o5(cl(k / PARTS)); g('spG2').setAttribute('opacity', k > 0 ? 1 : 0); g('spG2').setAttribute('y1', 475 + 62 * gg); g('spG2').setAttribute('y2', 475 + 62 * gg); g('spG2').setAttribute('x2', 155 + 516 * gg);
-      g('spWr').setAttribute('width', 760 * o5(cl((k - PARTS * .1) / PARTS))); g('spUl').setAttribute('x2', 132 + 758 * o5(cl((k - PARTS * .05) / PARTS))); g('spBg').setAttribute('opacity', cl(k / PARTS));
-      if (m >= EXIT && !fired) { fired = true; if (cb) cb(); return; }
+      const show = c < 1.17 ? 0 : c < 1.7 ? 1 : 1 - cl((c - 1.7) / .12), k = c - 1.17;
+      const gg = o5(cl(k / .16)) * show;
+      g('spTri').setAttribute('opacity', cl(k / .08) * show); g('spBg').setAttribute('opacity', cl(k / .16) * show);
+      g('spG2').setAttribute('opacity', gg > .01 ? 1 : 0); g('spG2').setAttribute('y1', 475 + 62 * gg); g('spG2').setAttribute('y2', 475 + 62 * gg); g('spG2').setAttribute('x2', 155 + 516 * gg);
+      g('spWr').setAttribute('width', 760 * o5(cl((k - .02) / .16)) * show); g('spUl').setAttribute('x2', 132 + 758 * o5(cl((k - .01) / .16)) * show);
       requestAnimationFrame(f);
     }
     requestAnimationFrame(f);
-    return { ready(done) { if (rt >= 0) return; cb = done; rt = (performance.now() - t0) / 1000; } };
   })();
   const S = { get(k) { try { return localStorage.getItem('swapp.' + k) || ''; } catch (e) { return ''; } }, set(k, v) { try { v ? localStorage.setItem('swapp.' + k, v) : localStorage.removeItem('swapp.' + k); } catch (e) { } } };
   (() => { /* 起動画面：今していることの一言を0.3秒ずつ進める・今日の一言（前回アプリが教えてくれた今日の現場の数）（2026-11-26） */
@@ -189,9 +187,7 @@
     return os + (br ? '・' + br : '') + home;
   }
   // 起動画面を消す。アプリから合図が来たとき・合言葉の画面を出すとき。合図が来ない古い版でも閉じ込めないよう、枠の読み込みから15秒で消す
-  function spOff() { const s = document.getElementById('sp'), b = document.getElementById('spbar'); if (b && !b.classList.contains('done')) { b.classList.add('done'); setTimeout(() => b.remove(), 450); } if (!s || s.dataset.off) return; s.dataset.off = '1';
-    const gone = () => { s.classList.add('out'); setTimeout(() => s.remove(), 260); };
-    if (SPX && !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) { SPX.ready(gone); setTimeout(gone, 1500); } else gone(); } /* 2026-11-26：玉がロゴになってから（約0.4秒）大きく抜けて消える。動きが止まっても1.5秒で消す */ /* 2026-11-26：線を最後まで伸ばし、アイコンが大きくなりながら消える */
+  function spOff() { const s = document.getElementById('sp'), b = document.getElementById('spbar'); if (s) s.remove(); if (b && !b.classList.contains('done')) { b.classList.add('done'); setTimeout(() => b.remove(), 450); } } /* 準備ができた瞬間に消す（フェードも待ちもなし。2026-11-26 天田さん「遅くなることは論外」）。上の線だけは画面の邪魔をしないので最後まで伸びて消える */ /* 2026-11-26：線を最後まで伸ばし、アイコンが大きくなりながら消える */
   function gate(msg) {
     spOff();
     const f = document.getElementById('app'); if (f) f.remove();
