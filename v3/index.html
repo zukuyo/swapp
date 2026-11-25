@@ -98,14 +98,14 @@
       if (!document.getElementById('sp')) return;  /* 消えたら止める */
       const t = (now - t0) / 1000, pop = o3(cl(t / .25)), c = t;
       /* 1回だけ：0〜0.95秒 玉が回る → 0.95〜1.25秒 線に吸い込まれる → あとはロゴのまま準備を待つ（2026-11-26 天田さん「三回転するのは忙しない」。くり返しをやめ、回る速さも1周1秒に） */
-      const e = c < .95 ? 0 : c < 1.37 ? sst((c - .95) / .42) : 1; /* 「1 なめらかに」（2026-11-26 天田さん）：外へ広がらず、なめらかに線へ */
+      const e = c < 1.6 ? 0 : c < 2.02 ? sst((c - 1.6) / .42) : 1; /* 玉が回る時間を約1.6秒に（2026-11-26 天田さん「もうちょっと球が回る時間ほしい」） */ /* 「1 なめらかに」（2026-11-26 天田さん）：外へ広がらず、なめらかに線へ */
       const fl = 0;
       for (let i = 0; i < 3; i++) {
         const T = TGT[i], A = arc(t * SPIN + i * TAU / 3, Math.max(sweep(t, i), e > 0 ? .25 : 0), R * (1 + fl));
         P[i].setAttribute('d', dd(e ? A.map((p, j) => { const fr = j / (N - 1), x = T.a[0] + (T.b[0] - T.a[0]) * fr, y = T.a[1] + (T.b[1] - T.a[1]) * fr; return [p[0] + (x - p[0]) * e, p[1] + (y - p[1]) * e]; }) : A));
         P[i].setAttribute('stroke-width', (BALL + (T.w - BALL) * e) * Math.max(pop, .001));
       }
-      const show = c < 1.265 ? 0 : 1, k = (c - 1.265) * .16 / .3;
+      const show = c < 1.915 ? 0 : 1, k = (c - 1.915) * .16 / .3;
       const gg = o5(cl(k / .16)) * show;
       g('spTri').setAttribute('opacity', cl(k / .08) * show); g('spBg').setAttribute('opacity', cl(k / .16) * show);
       g('spG2').setAttribute('opacity', gg > .01 ? 1 : 0); g('spG2').setAttribute('y1', 475 + 62 * gg); g('spG2').setAttribute('y2', 475 + 62 * gg); g('spG2').setAttribute('x2', 155 + 516 * gg);
