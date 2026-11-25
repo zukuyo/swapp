@@ -81,8 +81,8 @@
   const EXEC = 'https://script.google.com/macros/s/AKfycbxSB-wZdgOUeokFqoIKT4RjKyN3-roupbiJlbRINV0bdzMdXbmB8L8fuChSce2Jrvnd/exec';
   const S = { get(k) { try { return localStorage.getItem('swapp.' + k) || ''; } catch (e) { return ''; } }, set(k, v) { try { v ? localStorage.setItem('swapp.' + k, v) : localStorage.removeItem('swapp.' + k); } catch (e) { } } };
   (() => { /* 起動画面：今していることの一言を0.3秒ずつ進める・今日の一言（前回アプリが教えてくれた今日の現場の数）（2026-11-26） */
-    const st = document.getElementById('spSt'), words = ['つないでいます', '案件を読み込み中', '並べています', 'もうすぐです'];
-    let k = 0; const tick = () => { if (!document.getElementById('sp') || k >= words.length - 1) return; k++; st.innerHTML = '<span>' + words[k] + '</span>'; setTimeout(tick, k < 3 ? 300 : 900); }; setTimeout(tick, 300);
+    const st = document.getElementById('spSt'), words = ['つないでいます', '案件を読み込み中', '並べています']; /* 0.7秒ずつ・「もうすぐです」はなし（2026-11-26 天田さん） */
+    let k = 0; const tick = () => { if (!document.getElementById('sp') || k >= words.length - 1) return; k++; st.innerHTML = '<span>' + words[k] + '</span>'; setTimeout(tick, 700); }; setTimeout(tick, 700);
     const d = new Date(), ymd = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     let n = null; try { const t = JSON.parse(S.get('today') || 'null'); if (t && t.d === ymd) n = t.n; } catch (e) { }
     document.getElementById('spTd').innerHTML = (d.getMonth() + 1) + '月' + d.getDate() + '日（' + '日月火水木金土'[d.getDay()] + '）' + (n === null ? '' : '<small>' + (n ? '今日の現場 ' + n + '件' : '今日の現場はありません') + '</small>');
