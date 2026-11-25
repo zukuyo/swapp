@@ -77,17 +77,26 @@
   function open() {
     const k = S.get('k'); if (!k) return gate('');
     const q = new URLSearchParams(location.search), u = new URL(EXEC);
-    u.searchParams.set('k', k); u.searchParams.set('ui', '3'); u.searchParams.set('d', dev); u.searchParams.set('ua', devName()); if (q.get('id')) u.searchParams.set('id', q.get('id'));
+    u.searchParams.set('k', k); u.searchParams.set('ui', '3'); u.searchParams.set('d', dev); u.searchParams.set('ua', devName()); if (q.get('id')) u.searchParams.set('id', q.get('id')); if (/^[a-z]{2,10}$/.test(q.get('solo') || '')) u.searchParams.set('solo', q.get('solo')); /* 別ウインドウの2画面（2026-11-26） */
     let f = document.getElementById('app');
     if (!f) { f = document.createElement('iframe'); f.id = 'app'; f.title = 'SoundWich APP'; f.allow = 'clipboard-read; clipboard-write'; f.addEventListener('load', () => setTimeout(spOff, 15000)); document.body.appendChild(f); }
     f.src = u.toString();
     document.getElementById('gate').classList.remove('on');
-    const sv = S.get('split'); if (sv) setTimeout(() => splitOpen(sv), 1500); /* 2画面で閉じていたら、右も開き直す */
+    S.set('split', ''); /* 2画面は別ウインドウになったので、前の右半分は開き直さない（2026-11-26） */
   }
   // ===== 2画面（2026-11-21）：アプリから 'swapp:split:画面' が来たら右半分にその画面だけのアプリを開く。'swapp:unsplit' で閉じる。開いていた画面と幅は覚える
   const SPLIT_MIN = 1000;
+  // 2026-11-26 天田さん「2画面の時は別ウインドウのほうがいい」→「別ウインドウにする」：右半分の枠ではなく、入口ページを別ウインドウで開く（Googleの帯を出さないため入口ページごと開く）
   function splitOpen(v) {
-    /* 'cases:K-000123' のように案件を付けると、右半分でその案件を開く（2026-11-21 右クリックの「右半分で開く」） */
+    let id = ''; const cm = String(v).match(/^([a-z]{2,10}):([A-Za-z0-9_-]{1,40})$/); if (cm) { v = cm[1]; id = cm[2]; }
+    if (!/^[a-z]{2,10}$/.test(v)) return;
+    const u = new URL(location.href); u.search = ''; u.hash = ''; u.searchParams.set('solo', v); if (id) u.searchParams.set('id', id);
+    const w = Math.round(Math.min(screen.availWidth * 0.5, 1100)), h = Math.round(screen.availHeight * 0.9);
+    const win = window.open(u.toString(), 'swapp_split', 'popup,width=' + w + ',height=' + h + ',left=' + Math.round(screen.availWidth - w) + ',top=0');
+    if (win) { try { win.focus(); } catch (e) { } return; }
+    splitOpenPane(v + (id ? ':' + id : '')); /* 別ウインドウが止められたときだけ、前の右半分で開く */
+  }
+  function splitOpenPane(v) {
     let id = ''; const cm = String(v).match(/^([a-z]{2,10}):([A-Za-z0-9_-]{1,40})$/); if (cm) { v = cm[1]; id = cm[2]; }
     if (!/^[a-z]{2,10}$/.test(v) || window.innerWidth < SPLIT_MIN) return;
     const a = document.getElementById('app'); if (!a || !a.src) return;
@@ -136,7 +145,7 @@
   document.getElementById('f').addEventListener('submit', e => { e.preventDefault(); const v = document.getElementById('k').value.trim(); if (!v) return; S.set('k', v); document.getElementById('k').value = ''; open(); });
   // 知らせはアプリ（Googleの画面）から来たものだけ受け付ける。ほかのページからの「合言葉が違う」で、覚えた合言葉を消されないように（2026-11-16 バグチェック）
   const fromApp = o => /^https:\/\/([a-z0-9-]+\.)*(googleusercontent\.com|script\.google\.com)$/.test(String(o || ''));
-  window.addEventListener('message', e => { if (!fromApp(e.origin)) return; try { SWOFF.onMsg(e); } catch (er) { } if (e.data === 'swapp:ready') spOff(); if (e.data === 'swapp:reload') { location.reload(); return; } /* 2026-11-20 直した知らせの「更新する」 */ if (e.data === 'swapp:badkey') { S.set('k', ''); gate('合言葉が違います'); } if (typeof e.data === 'string' && e.data.indexOf('swapp:split:') === 0) splitOpen(e.data.slice(12)); if (e.data === 'swapp:unsplit') splitClose(); });
+  window.addEventListener('message', e => { if (!fromApp(e.origin)) return; try { SWOFF.onMsg(e); } catch (er) { } if (e.data === 'swapp:ready') spOff(); if (e.data === 'swapp:reload') { location.reload(); return; } /* 2026-11-20 直した知らせの「更新する」 */ if (e.data === 'swapp:badkey') { S.set('k', ''); gate('合言葉が違います'); } if (typeof e.data === 'string' && e.data.indexOf('swapp:split:') === 0) splitOpen(e.data.slice(12)); if (e.data === 'swapp:unsplit') { if (new URLSearchParams(location.search).get('solo')) window.close(); else splitClose(); } });
   // 1回だけ使える招待リンク（2026-11-19）：リンクの # のあとの i＝招待の番号。「開く」を押したときだけサーバーに問い合わせ、合言葉をこの端末に覚える。
   // LINEのプレビューや、ページを開いただけでは使われない。LINEの中の画面で開くと、そこに合言葉が入ってSafariでは開けなくなるので、LINEの中ではボタンを出さない
   // （送るリンクには ?openExternalBrowser=1 を付け、LINEから押すとSafariなどで開くようにしている）
