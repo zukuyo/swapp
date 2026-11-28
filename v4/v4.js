@@ -133,7 +133,7 @@ window.V4 = (function () {
     f.addEventListener('load', () => setTimeout(spOff, 15000));
     f.src = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
     document.body.appendChild(f);
-    window.addEventListener('message', function rd(e) { if (e.source === f.contentWindow && e.data === 'swapp:ready') { W.tr = Math.round(performance.now()); window.removeEventListener('message', rd); } });
+    window.addEventListener('message', function rd(e) { if (e.source === f.contentWindow && e.data === 'swapp:ready') { W.tr = Math.round(performance.now()); window.removeEventListener('message', rd); setTimeout(cfLive, 500); } });
   }
   // 画面の中で google.script.* の代わりをする（中身は親の受け渡し役に流す。url・history は入口ページのアドレスを使う。Googleの画面のときと同じ）
   function shimFn() {
@@ -220,6 +220,23 @@ window.V4 = (function () {
     }
     return undefined;
   }
+
+  // ===== 知らせ係とつなぎっぱなしにする（スピード計画フェーズ3-2。2026-11-29）=====
+  // Cloudflare の中身が変わったら「変わった（番号）」が届く。自分の手元より新しければ、すぐ画面に読み直させる（15秒ごとの確認を待たない）
+  function cfLive() {
+    if (CF.ws && CF.ws.readyState < 2) return; if (!lsGet('v4ks')) return;
+    let ws; try { ws = new WebSocket(API.replace(/^https/, 'wss') + '/ws'); } catch (e) { return; }
+    CF.ws = ws;
+    ws.onopen = () => { try { ws.send(JSON.stringify({ t: 'auth', k: K, d: dev })); } catch (e) { } CF.wsWait = 1000; clearInterval(CF.ping); CF.ping = setInterval(() => { try { ws.send('ping'); } catch (e) { } }, 45000); };
+    ws.onmessage = e => {
+      if (e.data === 'pong') return; let m = null; try { m = JSON.parse(e.data); } catch (x) { return; }
+      if ((m.t === 'v' || m.t === 'hello') && m.v > ((CF.st && CF.st.v) || 0)) cfPoke();
+    };
+    ws.onclose = () => { clearInterval(CF.ping); if (CF.ws === ws) CF.ws = null; if (document.visibilityState === 'visible') setTimeout(cfLive, CF.wsWait = Math.min((CF.wsWait || 1000) * 2, 30000)); };
+  }
+  // 画面に「今すぐ一覧を読み直して」と頼む（開いている案件も、版が変わっていれば読み直される）
+  function cfPoke() { if (Date.now() < CF.dirty) return; const f = document.getElementById('app'); try { f.contentWindow.eval('AR_BUSY = 0; autoRefresh();'); CF.pokes = (CF.pokes || 0) + 1; } catch (e) { } }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && W.tr) cfLive(); });
 
   // v3 の open() の先頭から呼ばれる。true＝ここで開いた
   function openV4() {
