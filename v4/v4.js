@@ -138,7 +138,16 @@ window.V4 = (function () {
     f.addEventListener('load', () => setTimeout(spOff, 15000));
     f.src = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
     document.body.appendChild(f);
-    window.addEventListener('message', function rd(e) { if (e.source === f.contentWindow && e.data === 'swapp:ready') { W.tr = Math.round(performance.now()); window.removeEventListener('message', rd); setTimeout(cfLive, 500); } });
+    window.addEventListener('message', function rd(e) { if (e.source === f.contentWindow && e.data === 'swapp:ready') { W.tr = Math.round(performance.now()); window.removeEventListener('message', rd); setTimeout(cfLive, 500); setTimeout(newsTry, 600); } });
+  }
+  /* Ver4 のお知らせ（2026-11-29 天田さん「二人に実装する時、いっかいめだけ」「システムの中に残さないように」）。梅木さん・畑山さんだけ、端末ごとに1回。
+     部品は news/ にだけ置き、Google の本体には入れない。アドレスに ?news=1 を付けると誰でも見られる（見え方の確かめ用。印は付けない）。
+     二人が見終わったら、この関数・上の呼び出し・news/ フォルダを消す（母艦 01_経営/天田CRM（試作）.md の次にやること） */
+  function newsTry() {
+    const force = /[?&]news=1/.test(location.search);
+    if (!force && (['梅木', '畑山'].indexOf(lsGet('v4who')) < 0 || lsGet('news4'))) return;
+    if (!force) lsSet('news4', '1');
+    const s = document.createElement('script'); s.src = BASE + 'news/news.js'; document.head.appendChild(s);
   }
   // 画面の中で google.script.* の代わりをする（中身は親の受け渡し役に流す。url・history は入口ページのアドレスを使う。Googleの画面のときと同じ）
   function shimFn() {

@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SoundWich Ver4 お知らせ（見本）</title>
+<style>
+body{margin:0;min-height:100vh;background:#dfe6ee;font-family:-apple-system,"Hiragino Sans",sans-serif}
+#swn{font-family:-apple-system,"Hiragino Sans",sans-serif;position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(4,14,24,.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:swnIn .35s ease}
+@keyframes swnIn{from{opacity:0}to{opacity:1}}
+#swn .c{position:relative;display:flex;flex-direction:column;width:min(560px,92vw);height:min(690px,92vh);overflow:hidden;border-radius:22px;background:#07182a;color:#e8f1f8;box-shadow:0 30px 80px rgba(0,0,0,.5),0 0 0 1px rgba(120,200,255,.14);animation:swnUp .45s cubic-bezier(.2,.9,.3,1)}
+@keyframes swnUp{from{transform:translateY(18px) scale(.98);opacity:0}to{transform:none;opacity:1}}
+#swn .vp{flex:1;min-height:0;overflow:hidden}
+#swn .tr{height:100%;display:flex;transition:transform .45s cubic-bezier(.2,.9,.3,1)}
+#swn .pg{flex:0 0 100%;box-sizing:border-box;display:flex;flex-direction:column;height:100%;overflow:auto}
+#swn .hl{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:18px}
+#swn .hl div{padding:12px 10px;border-radius:12px;background:rgba(120,200,255,.06);border:1px solid rgba(120,200,255,.12);text-align:center}
+#swn .hl b{display:block;font-size:20px;font-weight:900;color:#5ccfff;line-height:1.2}
+#swn .hl span{font-size:11.5px;color:#9fb6cc}
+#swn .dt{margin-top:16px;font-size:11px;color:#6f8aa1;letter-spacing:.08em}
+#swn .im{position:relative;aspect-ratio:16/9;background:#020a14 center/cover no-repeat;flex:none}
+#swn .im:after{content:'';position:absolute;inset:auto 0 0 0;height:45%;background:linear-gradient(transparent,#07182a)}
+#swn .bd{padding:4px 26px 16px}
+#swn .pg+.pg .im{aspect-ratio:3/1}
+#swn .pg+.pg h2{font-size:23px;margin-top:10px}
+#swn .tag{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.18em;color:#5ccfff;border:1px solid rgba(92,207,255,.45);border-radius:999px;padding:3px 10px}
+#swn h2{margin:12px 0 6px;font-size:27px;line-height:1.25;font-weight:800;letter-spacing:.01em}
+#swn h2 em{font-style:normal;background:linear-gradient(90deg,#5ccfff,#a8e8ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+#swn p.ld{margin:0;color:#a9bfd2;font-size:14px;line-height:1.7}
+#swn ul{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:7px}
+#swn li{display:flex;gap:11px;align-items:flex-start;padding:8px 12px;border-radius:12px;background:rgba(120,200,255,.06);border:1px solid rgba(120,200,255,.1)}
+#swn li svg{flex:none;width:22px;height:22px;stroke:#5ccfff;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;margin-top:1px}
+#swn li b{display:block;font-size:14px;color:#fff}
+#swn li span{font-size:12.5px;color:#9fb6cc;line-height:1.55}
+#swn .big{display:flex;align-items:baseline;gap:8px;margin:6px 0 2px}
+#swn .big strong{font-size:56px;line-height:1;font-weight:900;background:linear-gradient(90deg,#5ccfff,#e6f8ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+#swn .big span{font-size:18px;font-weight:800}
+#swn table{width:100%;border-collapse:separate;border-spacing:0;margin-top:12px;font-size:13px}
+#swn th,#swn td{padding:9px 10px;text-align:left;border-bottom:1px solid rgba(120,200,255,.1)}
+#swn th{font-size:11px;color:#7f9bb3;font-weight:700;letter-spacing:.06em}
+#swn td:nth-child(2){color:#8aa3b8}
+#swn td:nth-child(3){color:#5ccfff;font-weight:800}
+#swn td:first-child{color:#d7e5f1}
+#swn .bars{display:grid;gap:8px;margin:14px 0 4px}
+#swn .bar{display:grid;grid-template-columns:44px 1fr 58px;align-items:center;gap:10px;font-size:12px;font-weight:800}
+#swn .bar i{display:block;height:12px;border-radius:6px;background:rgba(255,255,255,.18);transform-origin:left;animation:swnBar 1.1s cubic-bezier(.2,.9,.3,1) both}
+#swn .bar.v4 i{background:linear-gradient(90deg,#2fa9ff,#8fe3ff);box-shadow:0 0 14px rgba(92,207,255,.6)}
+#swn .bar em{font-style:normal;text-align:right;color:#8aa3b8}#swn .bar.v4 em{color:#5ccfff}
+@media (max-width:480px){#swn .c{height:min(740px,90vh)}}
+@keyframes swnBar{from{transform:scaleX(0)}}
+#swn .nt{font-size:11px;color:#6f8aa1;margin-top:8px}
+#swn .ft{flex:none;display:flex;align-items:center;justify-content:space-between;padding:12px 18px 16px;border-top:1px solid rgba(120,200,255,.08);background:#07182a}
+#swn .dots{display:flex;gap:7px}
+#swn .dots i{width:7px;height:7px;border-radius:4px;background:rgba(255,255,255,.22);transition:all .3s}
+#swn .dots i.on{width:20px;background:#5ccfff}
+#swn button{font:inherit;cursor:pointer;border:0;border-radius:999px}
+#swn .nv{width:40px;height:40px;background:rgba(255,255,255,.08);color:#fff;display:grid;place-items:center}
+#swn .nv:disabled{opacity:.25;cursor:default}
+#swn .nv svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#swn .go{padding:0 22px;height:40px;background:#5ccfff;color:#04192a;font-weight:800;font-size:14px}
+#swn .x{position:absolute;top:12px;right:12px;z-index:2;width:32px;height:32px;background:rgba(0,0,0,.35);color:#fff;font-size:18px;line-height:32px}
+</style></head><body>
+<div id="swn" role="dialog" aria-modal="true" aria-label="SoundWich APP Ver4 のお知らせ">
+ <div class="c">
+  <button class="x" aria-label="閉じる" onclick="swnClose()">×</button>
+  <div class="vp"><div class="tr" id="swnTr">
+   <section class="pg">
+    <div class="im" style="background-image:url(p1.jpg)"></div>
+    <div class="bd">
+     <span class="tag">NEWS</span>
+     <h2>SoundWich APP<br><em>Ver4</em> へ</h2>
+     <p class="ld">開くのも、押すのも、届くのも。<br>ぜんぶ、待たないアプリになりました。</p>
+     <div class="hl"><div><b>約10倍</b><span>速く開く</span></div><div><b>すぐ</b><span>押したら反映</span></div><div><b>瞬間</b><span>新しい連絡が届く</span></div></div>
+     <div class="dt">2026.11 UPDATE</div>
+    </div>
+   </section>
+   <section class="pg">
+    <div class="im" style="background-image:url(p2.jpg)"></div>
+    <div class="bd">
+     <span class="tag">NEW</span>
+     <h2>新しくなったところ</h2>
+     <ul>
+      <li><svg viewBox="0 0 24 24"><path d="M12 3C6.5 3 2 6.6 2 11c0 4 3.5 7.2 8.3 7.9l-.5 2.6c-.1.5.4.8.8.5l4-2.9C19 18.1 22 15 22 11c0-4.4-4.5-8-10-8z"/></svg><div><b>チャットがLINEのように</b><span>相手のアイコンつきの一覧。開いたら最新のやりとりから。</span></div></li>
+      <li><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M8.5 7V5.5A1.5 1.5 0 0 1 10 4h4a1.5 1.5 0 0 1 1.5 1.5V7M3 12.5h18"/></svg><div><b>案件ページを一枚に</b><span>スクロールしなくても全体が見える。開催場所と過去の案件も見出しに。</span></div></li>
+      <li><svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg><div><b>押した瞬間に変わる</b><span>保存やステータスの変更を、待たずに画面へ。新しい連絡も届いた瞬間に。</span></div></li>
+      <li><svg viewBox="0 0 24 24"><path d="M5 12l4 4L19 6"/></svg><div><b>「返信しなくていい」の印</b><span>未返信を自分で片づけられます。</span></div></li>
+      <li><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3.5"/><path d="M9 3v18"/></svg><div><b>左のメニューを新しく</b><span>チャットが一番上に。使い方は「設定」の中へ。</span></div></li>
+     </ul>
+    </div>
+   </section>
+   <section class="pg">
+    <div class="im" style="background-image:url(p3.jpg)"></div>
+    <div class="bd">
+     <span class="tag">SPEED</span>
+     <div class="big"><strong>約10倍</strong><span>速く開く</span></div>
+     <p class="ld">Ver3 で約5〜6秒かかっていた起動が、0.5秒以内に。</p>
+     <div class="bars"><div class="bar"><span>Ver3</span><i style="width:100%"></i><em>約5.5秒</em></div><div class="bar v4"><span>Ver4</span><i style="width:7%"></i><em>約0.4秒</em></div></div>
+     <table>
+      <tr><th></th><th>Ver3</th><th>Ver4</th></tr>
+      <tr><td>開いて一覧が出るまで</td><td>4.7〜6.2秒</td><td>0.3〜0.5秒</td></tr>
+      <tr><td>新しい連絡が届くまで</td><td>15秒ごとに確認</td><td>届いた瞬間</td></tr>
+      <tr><td>押したあとの反映</td><td>1〜2秒待つ</td><td>すぐ</td></tr>
+     </table>
+     <div class="nt">iPhoneでの実測（2回目以降に開いたとき）</div>
+    </div>
+   </section>
+  </div>
+  </div>
+  <div class="ft">
+   <button class="nv" id="swnP" aria-label="前へ" onclick="swnGo(-1)"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+   <div class="dots" id="swnD"><i class="on"></i><i></i><i></i></div>
+   <button class="nv" id="swnN" aria-label="次へ" onclick="swnGo(1)"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+  </div>
+ </div>
+</div>
+<script src="news.js"></script>
+</body></html>
