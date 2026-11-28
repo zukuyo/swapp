@@ -116,7 +116,7 @@
     b.srv = { t0: 0, l: 0, url: EXEC, b: S.get('v4build') };
     const v = {
       key: JSON.stringify(K), who: JSON.stringify(S.get('v4who')), dev: JSON.stringify(dev),
-      boot: JSON.stringify(b).replace(/</g, '\\u003c').replace(/ | /g, ''),
+      boot: JSON.stringify(b).replace(/</g, '\\u003c').replace(/\u2028|\u2029/g, ''),
       canWrite: S.get('v4cw') ? 'true' : 'false', canSend: S.get('v4cs') ? 'true' : 'false', solo: '""', ui3: 'true'
     };
     Object.keys(v).forEach(k => { html = html.split('@@SWAPP_' + k + '@@').join(v[k]); });
