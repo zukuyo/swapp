@@ -33,7 +33,7 @@ window.V4 = (function () {
         .catch(e => { CF.down = Date.now() + 60000; console.warn('Cloudflare', e); W.call0(fn, args, s, f, u); });
       return;
     }
-    if (WRITES.includes(fn)) { CF.dirty = Math.max(CF.dirty, Date.now() + (QUICKW.includes(fn) ? 20000 : 90000)); CF.dirtyBy = fn; } /* 急ぎの書き込み（3-3）は、画面を先に変えてあり、Cloudflare にも約10秒で写るので20秒だけ */ // 書いた直後の90秒は Google から読む（自分の操作をすぐ見せる。Cloudflare に写るのは最大1分ほどあと）
+    if (WRITES.includes(fn)) { CF.dirty = Math.max(CF.dirty, Date.now() + (QUICKW.includes(fn) ? 20000 : 90000)); CF.dirtyBy = fn; const s0 = s; s = function (r, uu) { CF.wAt = Date.now(); if (s0) s0(r, uu); }; } /* 書けた時刻を覚え、写しがそれより古い間は Google から読む（2026-11-29 強めの点検：20秒後の最初の読み直しで書く前の形に戻って見えた） */ /* 急ぎの書き込み（3-3）は、画面を先に変えてあり、Cloudflare にも約10秒で写るので20秒だけ */ // 書いた直後の90秒は Google から読む（自分の操作をすぐ見せる。Cloudflare に写るのは最大1分ほどあと）
     W.call0(fn, args, s, f, u);
   };
   W.call0 = function (fn, args, s, f, u) {
@@ -61,7 +61,7 @@ window.V4 = (function () {
     stg('つなぎを開いています'); br = document.createElement('iframe'); br.style.display = 'none'; br.title = 'つなぎ';
     br.src = EXEC + '?bridge=1&k=' + encodeURIComponent(K) + '&d=' + encodeURIComponent(dev) + '&ua=' + encodeURIComponent(devName());
     document.body.appendChild(br);
-    setTimeout(() => { if (W.src) return; W.q.splice(0).forEach(m => W.done({ id: m.id, ok: 0, m: 'NetworkError: つなぎが答えません' })); }, 25000);
+    setTimeout(() => { if (W.src) return; W.q.splice(0).forEach(m => W.done({ id: m.id, ok: 0, m: 'NetworkError: つなぎが答えません' })); if (!W.tr && !W.off) toV3(''); }, 25000); /* 初めて開く人でつなぎが答えないときは、起動画面のまま止めず今の形で開く（2026-11-29） */
   }
   window.addEventListener('message', e => {
     if (GORG.test(e.origin) && typeof e.data === 'string' && /^swapp:v4on:[01]$/.test(e.data)) { lsSet('v4on', e.data.slice(-1) === '1' ? '1' : ''); return; } // 今の形で開いたときに Google が「この人は新しい仕組み」と教える
@@ -222,6 +222,7 @@ window.V4 = (function () {
     st.v = j.v; if (j.items.length) cfSave();
     if (!st.LM || !st.U) throw new Error('一覧がまだありません');
     const lm = st.LM;
+    if (CF.wAt && Date.now() - CF.wAt < 90000 && !(Number(lm.ts) > CF.wAt - 2000)) return undefined; /* 写しがまだ書く前の形：Google から読む（90秒まで） */
     return { at: lm.at, ts: lm.ts, list: lm.order.map(id => st.L[id]).filter(Boolean), marks: lm.marks, v2: Object.assign({}, lm.v2, { fb: st.U.fb }), members: lm.members, mmails: lm.mmails, seen: st.U.seen, prefs: st.U.prefs };
   }
   // 案件の中身：画面が欲しい版（ver）と同じものがあれば返す。なければ undefined（Google へ）
@@ -230,7 +231,7 @@ window.V4 = (function () {
     if (want.length) { const j = await cfPost('/cases', { ids: want.slice(0, 40) }, 4000); await Promise.all(j.items.map(async it => { if (it.data) CF.cases[it.k.slice(2)] = await unseal(it.data, lsGet('v4ks')); })); }
   }
   async function cfRoute(fn, args) {
-    if (fn === 'listCases' || fn === 'listAuto') return await cfSync();
+    if (fn === 'listCases' || fn === 'listAuto') { const r = await cfSync(); if (r === undefined && fn === 'listAuto') CF.dirty = Math.max(CF.dirty, Date.now() + 5000); return r; }
     if (fn === 'pulse') { const j = await cfPost('/ver', {}, 3000); if (!(Date.now() - (j.at || 0) < CF_FRESH)) return undefined; const lm = (CF.st && CF.st.LM) || {}; return 'cf' + j.v + '\t' + (lm.build || '') + '\t' + (lm.force || ''); }
     if (fn === 'prefetch') { const ids = (args[0] || []).map(x => String(x).split('|')[0]); cfCases(ids).catch(() => { }); return true; }
     if (fn === 'getCase') {
@@ -259,7 +260,7 @@ window.V4 = (function () {
     ws.onclose = () => { clearInterval(CF.ping); if (CF.ws === ws) CF.ws = null; if (document.visibilityState === 'visible') setTimeout(cfLive, CF.wsWait = Math.min((CF.wsWait || 1000) * 2, 30000)); };
   }
   // 画面に「今すぐ一覧を読み直して」と頼む（開いている案件も、版が変わっていれば読み直される）
-  function cfPoke() { if (Date.now() < CF.dirty) return; const f = document.getElementById('app'); try { f.contentWindow.eval('AR_BUSY = 0; autoRefresh();'); CF.pokes = (CF.pokes || 0) + 1; } catch (e) { } }
+  function cfPoke() { if (Date.now() < CF.dirty) { clearTimeout(CF.pt); CF.pt = setTimeout(cfPoke, CF.dirty - Date.now() + 300); return; } /* 書いた直後に来た「変わった」の知らせも、待ってから読み直す（捨てない） */ const f = document.getElementById('app'); try { f.contentWindow.eval('AR_BUSY = 0; autoRefresh();'); CF.pokes = (CF.pokes || 0) + 1; } catch (e) { } }
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && W.tr) cfLive(); });
 
   // v3 の open() の先頭から呼ばれる。true＝ここで開いた
