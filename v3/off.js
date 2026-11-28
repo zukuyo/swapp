@@ -25,10 +25,11 @@
   const b64Blob = (b64, mime) => { const bin = atob(b64), a = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return new Blob([a], { type: mime || 'application/octet-stream' }); };
 
   // ===== アプリからの知らせ =====
+  // swapp:boot：入口ページを開いてから ready までの時間をアプリに返す（2026-11-28 開く速さの計測。アプリ側が12/5まで記録）
   let READY = false;
   function onMsg(e) {
     const d = e.data;
-    if (d === 'swapp:ready') { READY = true; whenFree(hide); sendInfo(e.source, e.origin); return; } // 押さなくてもアプリに戻す（2026-11-28 天田さん）。ファイルを見ている途中だけ、閉じてから戻す
+    if (d === 'swapp:ready') { try { e.source.postMessage({ t: 'swapp:boot', o: Math.round(performance.timeOrigin), now: Date.now(), ms: Math.round(performance.now()), sp: !!document.getElementById('sp') }, '*'); } catch (er) { } READY = true; whenFree(hide); sendInfo(e.source, e.origin); return; } // 押さなくてもアプリに戻す（2026-11-28 天田さん）。ファイルを見ている途中だけ、閉じてから戻す
     if (!d || typeof d !== 'object') return;
     const reply = m => { try { e.source.postMessage(m, e.origin); } catch (er) { } };
     if (d.t === 'swapp:pack' && d.pack) { kvPut('pack', d.pack).catch(() => { }); prune(d.pack.ids); }
