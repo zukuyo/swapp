@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>SoundWich APP</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#000000">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="icon" href="../favicon-32.png">
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://script.googleusercontent.com">
+<style>
+  html,body{margin:0;height:100%;background:#000;overflow:hidden}
+  #app{position:fixed;inset:0;width:100%;height:100%;border:0;background:#000}
+  #msg{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#8e8e93;font:15px -apple-system,sans-serif}
+</style>
+</head>
+<body>
+<div id="msg"></div>
+<script>
+/* 試し（2026-11-28）：画面は端末に取っておいた束（暗号）と前回の一覧ですぐ描き、Googleは見えない枠の受け渡し役だけ。
+   初めての端末・鍵がない端末は、受け渡し役から鍵をもらってから描く。許可されていない端末は v3 に回す */
+(function () {
+  const EXEC = 'https://script.google.com/macros/s/AKfycbxSB-wZdgOUeokFqoIKT4RjKyN3-roupbiJlbRINV0bdzMdXbmB8L8fuChSce2Jrvnd/exec';
+  const GORG = /^https:\/\/[a-z0-9-]+-script\.googleusercontent\.com$/;
+  const S = { get(k) { try { return localStorage.getItem('swapp.' + k) || ''; } catch (e) { return ''; } }, set(k, v) { try { v ? localStorage.setItem('swapp.' + k, v) : localStorage.removeItem('swapp.' + k); } catch (e) { } } };
+  const h = new URLSearchParams(location.hash.slice(1)); if (h.get('k')) S.set('k', h.get('k'));
+  const K = S.get('k'); if (!K) { location.replace('../v3/' + location.search + location.hash); return; }
+  let dev = S.get('d'); if (!dev) { dev = Array.from(crypto.getRandomValues(new Uint8Array(9)), b => b.toString(36).padStart(2, '0')).join('').slice(0, 14); S.set('d', dev); }
+  const ua = (/iPhone|iPad/.test(navigator.userAgent) ? 'iPhone' : /Mac/.test(navigator.userAgent) ? 'Mac' : 'その他') + '・' + (/CriOS|Chrome/.test(navigator.userAgent) ? 'Chrome' : 'Safari');
+  const msg = t => { const m = document.getElementById('msg'); if (m) m.textContent = t; };
+  const BOOT_FN = ['listCases', 'listAuto', 'refreshAll'];
+  const W = window.SW4 = { src: null, org: '', q: [], pend: {}, id: 0, tb: 0, tr: 0, tf: 0, cached: false, started: false };
+
+  // ===== 受け渡し役 =====
+  W.call = function (fn, args, s, f, u) {
+    const id = ++W.id; W.pend[id] = { s, f, u, fn };
+    const m = { t: 'swapp:call', id, fn, args };
+    if (W.src) W.post(m); else W.q.push(m);
+  };
+  W.post = function (m) { try { W.src.postMessage(m, W.org); } catch (e) { W.done({ id: m.id, ok: 0, m: 'NetworkError: ' + e }); } };
+  W.done = function (d) {
+    const p = W.pend[d.id]; if (!p) return; delete W.pend[d.id];
+    if (d.ok) {
+      if (BOOT_FN.includes(p.fn) && d.r && d.r.list) { saveBoot(d.r); if (W.tr && !W.tf) { W.tf = Math.round(performance.now()); logFresh(); } }
+      if (p.s) try { p.s(d.r, p.u); } catch (e) { console.error(e); }
+    } else { const er = new Error(d.m); if (p.f) try { p.f(er, p.u); } catch (e) { console.error(e); } else console.error(er); }
+  };
+  W.hist = function (kind, st, pa) {
+    const q = new URLSearchParams(pa || {}).toString(), u = location.pathname + (q ? '?' + q : '') + location.hash;
+    try { kind === 'replace' ? history.replaceState(st, '', u) : history.pushState(st, '', u); } catch (e) { }
+  };
+  const br = document.createElement('iframe'); br.style.display = 'none'; br.title = 'つなぎ';
+  br.src = EXEC + '?bridge=1&k=' + encodeURIComponent(K) + '&d=' + encodeURIComponent(dev) + '&ua=' + encodeURIComponent(ua);
+  document.body.appendChild(br);
+  setTimeout(() => { if (W.src) return; const q = W.q.splice(0); q.forEach(m => W.done({ id: m.id, ok: 0, m: 'NetworkError: つなぎが答えません' })); }, 25000);
+
+  window.addEventListener('message', e => {
+    const d = e.data;
+    if (GORG.test(e.origin) && d && typeof d === 'object') {
+      if (d.t === 'swapp:bridge') {
+        if (!d.ok) { S.set('v4ak', ''); location.replace('../v3/' + location.search + location.hash); return; }
+        W.src = e.source; W.org = e.origin; W.tb = Math.round(performance.now());
+        S.set('v4ak', d.ak); S.set('v4who', d.who); S.set('v4build', d.build); S.set('v4cw', d.cw ? '1' : ''); S.set('v4cs', d.cs ? '1' : '');
+        W.q.splice(0).forEach(W.post);
+        if (!W.started) start(false);
+      } else if (d.t === 'swapp:res') W.done(d);
+      return;
+    }
+    const app = document.getElementById('app');
+    if (!app || e.source !== app.contentWindow) return;
+    if (d === 'swapp:ready' && !W.tr) {
+      W.tr = Math.round(performance.now());
+      try { app.contentWindow.postMessage({ t: 'swapp:boot', ms: W.tr, sp: false, v4: 1, cached: W.cached ? 1 : 0, o: Math.round(performance.timeOrigin), now: Date.now() }, '*'); } catch (er) { }
+      const m = document.getElementById('msg'); if (m) m.remove();
+    } else if (d === 'swapp:reload') location.reload();
+  });
+
+  // ===== 前回の一覧・画面の束 =====
+  function saveBoot(v) { setTimeout(() => { try { const c = Object.assign({}, v); delete c.srv; delete c.stale; localStorage.setItem('swapp.v4boot', JSON.stringify(c)); } catch (e) { } }, 0); }
+  function loadBoot() { try { return JSON.parse(localStorage.getItem('swapp.v4boot') || 'null'); } catch (e) { return null; } }
+  const hex = s => new Uint8Array(s.match(/../g).map(x => parseInt(x, 16)));
+  async function openBin(buf, ak) {
+    const key = await crypto.subtle.importKey('raw', hex(ak), 'AES-GCM', false, ['decrypt']);
+    const b = new Uint8Array(buf), gz = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b.slice(0, 12) }, key, b.slice(12));
+    return await new Response(new Blob([gz]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+  }
+  async function cachedBin() { try { const c = await caches.open('swapp-v4'); const r = await c.match('app.bin'); return r ? await r.arrayBuffer() : null; } catch (e) { return null; } }
+  async function netBin() {
+    const l = await (await fetch('latest.json?t=' + Date.now(), { cache: 'no-store' })).json();
+    const r = await fetch(l.f); if (!r.ok) throw new Error('束がありません');
+    const buf = await r.arrayBuffer();
+    try { const c = await caches.open('swapp-v4'); await c.put('app.bin', new Response(buf, { headers: { 'x-b': l.b } })); S.set('v4bin', l.b); } catch (e) { }
+    return buf;
+  }
+  // 描いたあとで、新しい束があれば次に開くときのために取っておく
+  function refreshBin() { setTimeout(async () => { try { const l = await (await fetch('latest.json?t=' + Date.now(), { cache: 'no-store' })).json(); if (l.b !== S.get('v4bin')) await netBin(); } catch (e) { } }, 5000); }
+
+  async function start(fromCache) {
+    if (W.started) return; const ak = S.get('v4ak'); if (!ak) return;
+    let buf = await cachedBin(), boot = loadBoot();
+    if (fromCache && (!buf || !boot)) return; // 取っておいた分がないときは、受け渡し役を待つ
+    if (W.started) return; W.started = true; W.cached = !!(fromCache && buf && boot);
+    try {
+      if (!buf) { msg('読み込んでいます'); buf = await netBin(); }
+      let html; try { html = await openBin(buf, ak); } catch (e) { buf = await netBin(); html = await openBin(buf, ak); }
+      if (!boot) boot = await new Promise((ok, ng) => W.call('listCases', [{ __k: K, __d: dev }], r => { ok(r); }, ng));
+      render(html, boot);
+      refreshBin();
+    } catch (e) { W.started = false; msg('開けませんでした：' + (e && e.message || e)); }
+  }
+  function render(html, boot) {
+    const b = Object.assign({}, boot); if (W.cached) b.stale = 1;
+    b.srv = { t0: 0, l: 0, url: EXEC, b: S.get('v4build') };
+    const v = {
+      key: JSON.stringify(K), who: JSON.stringify(S.get('v4who')), dev: JSON.stringify(dev),
+      boot: JSON.stringify(b).replace(/</g, '\\u003c').replace(/ | /g, ''),
+      canWrite: S.get('v4cw') ? 'true' : 'false', canSend: S.get('v4cs') ? 'true' : 'false', solo: '""', ui3: 'true'
+    };
+    Object.keys(v).forEach(k => { html = html.split('@@SWAPP_' + k + '@@').join(v[k]); });
+    const shim = '<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"><script>(' + shimFn.toString() + ')();<\/script>';
+    html = html.replace(/<head>/i, '<head>' + shim);
+    const f = document.createElement('iframe'); f.id = 'app'; f.title = 'SoundWich APP'; f.allow = 'clipboard-read; clipboard-write';
+    f.src = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+    document.body.appendChild(f);
+  }
+  // 画面の中で google.script.* の代わりをする（中身は親の受け渡し役に流す）
+  function shimFn() {
+    var P = window.parent.SW4;
+    function prm() { var o = {}; new URLSearchParams(window.parent.location.search).forEach(function (v, k) { o[k] = v; }); return o; }
+    function runner() {
+      var s, f, u; var p = new Proxy({}, { get: function (_, n) {
+        if (n === 'withSuccessHandler') return function (x) { s = x; return p; };
+        if (n === 'withFailureHandler') return function (x) { f = x; return p; };
+        if (n === 'withUserObject') return function (x) { u = x; return p; };
+        return function () { P.call(String(n), Array.prototype.slice.call(arguments), s, f, u); };
+      } }); return p;
+    }
+    window.google = { script: {
+      get run() { return runner(); },
+      url: { getLocation: function (cb) { setTimeout(function () { cb({ parameter: prm(), parameters: {}, hash: '' }); }, 0); } },
+      history: {
+        push: function (st, pa) { P.hist('push', st, pa); }, replace: function (st, pa) { P.hist('replace', st, pa); },
+        setChangeHandler: function (fn) { window.parent.addEventListener('popstate', function (e) { fn({ state: e.state, location: { parameter: prm(), parameters: {}, hash: '' } }); }); }
+      },
+      host: { close: function () { }, setHeight: function () { }, setWidth: function () { }, origin: location.origin, editor: { focus: function () { } } }
+    } };
+  }
+  function logFresh() {
+    W.call('logTiming', [ua, { v4: 1, cached: W.cached ? 1 : 0, bridge: W.tb, ready: W.tr, fresh: W.tf, o: Math.round(performance.timeOrigin), w: innerWidth }, { __k: K, __d: dev }], null, null);
+  }
+  start(true);
+})();
+</script>
+</body>
+</html>
