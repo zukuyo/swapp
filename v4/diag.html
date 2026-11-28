@@ -1,13 +1,20 @@
 <!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>診断</title>
-<style>body{background:#1c1c1e;color:#f2f2f7;font:13px/1.6 -apple-system,sans-serif;padding:16px}</style></head><body><div id="o"></div>
+<style>body{background:#1c1c1e;color:#f2f2f7;font:13px/1.6 -apple-system,sans-serif;padding:16px}a{color:#4c9bff}</style></head><body><div id="o"></div>
+<p><a href="?reset=1">この端末の試し版の控えと印を消す（合言葉は残す）</a>　<a href="./">試し版を開く</a></p>
 <script>
 const o=document.getElementById('o'),L=t=>{const d=document.createElement('div');d.textContent=t;o.appendChild(d);};
 const g=k=>{try{return localStorage.getItem('swapp.'+k)||''}catch(e){return 'ERR'}};
 (async()=>{
- ['k','d','v4ak','v4who','v4build','v4bin','v4lag','v4cw'].forEach(k=>{const v=g(k);L(k+'：'+(v?(/build|bin|lag|who|cw/.test(k)?v:'あり'+v.length):'なし'));});
- L('v4boot：'+Math.round(g('v4boot').length/1024)+'KB');
- try{const c=await caches.open('swapp-v4');const m=await c.match('app.bin');L('束の控え：'+(m?'あり':'なし'));}catch(e){L('caches：'+e);}
+ if (new URLSearchParams(location.search).get('reset')) {
+  ['v4lag','v4bin','v4build','cfst','v4boot'].forEach(k=>{try{localStorage.removeItem('swapp.'+k)}catch(e){}});
+  try{for(const k of await caches.keys()) if(/^swapp-v4/.test(k)) await caches.delete(k);}catch(e){}
+  try{for(const r of await navigator.serviceWorker.getRegistrations()) if(/\/v4\//.test(r.scope)) await r.unregister();}catch(e){}
+  L('消しました。「試し版を開く」を押してください（1回目は少し遅いです）');
+ }
+ ['k','d','v4ak','v4ks','v4ku','v4who','v4build','v4bin','v4lag','v4cw'].forEach(k=>{const v=g(k);L(k+'：'+(v?(/build|bin|lag|who|cw/.test(k)?v:'あり'+v.length):'なし'));});
+ L('v4boot：'+Math.round(g('v4boot').length/1024)+'KB　cfst：'+Math.round(g('cfst').length/1024)+'KB');
+ try{L('caches：'+(await caches.keys()).join(', '));}catch(e){L('caches：'+e);}
+ try{const r=await navigator.serviceWorker.getRegistrations();L('SW：'+r.map(x=>x.scope.replace(location.origin,'')+'（'+(x.active&&x.active.scriptURL.split('/').pop())+'）').join(', '));}catch(e){}
  try{const l=await (await fetch('latest.json?t='+Date.now(),{cache:'no-store'})).json();L('latest：'+l.b);}catch(e){L('latest：'+e);}
- try{const r=await navigator.serviceWorker.getRegistrations();L('SW：'+r.length);}catch(e){}
 })();
 </script></body></html>
