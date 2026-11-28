@@ -28,7 +28,7 @@
   let READY = false;
   function onMsg(e) {
     const d = e.data;
-    if (d === 'swapp:ready') { READY = true; if (el.classList.contains('on') && V.why === '遅い') draw(); else hide(); sendInfo(e.source, e.origin); return; } // 控えを読んでいる途中なら、急に消さず「アプリに戻る」を出す
+    if (d === 'swapp:ready') { READY = true; whenFree(hide); sendInfo(e.source, e.origin); return; } // 押さなくてもアプリに戻す（2026-11-28 天田さん）。ファイルを見ている途中だけ、閉じてから戻す
     if (!d || typeof d !== 'object') return;
     const reply = m => { try { e.source.postMessage(m, e.origin); } catch (er) { } };
     if (d.t === 'swapp:pack' && d.pack) { kvPut('pack', d.pack).catch(() => { }); prune(d.pack.ids); }
@@ -133,6 +133,9 @@
       draw();
     });
   }
+  // ファイルのプレビュー（#offv）を開いている間は待ち、閉じたら fn を行う
+  let AFTER = null;
+  function whenFree(fn) { if (document.getElementById('offv')) AFTER = fn; else fn(); }
   function hide() { el.classList.remove('on'); bar.classList.remove('on'); const v = document.getElementById('offv'); if (v) v.remove(); }
   // メニュー：アプリと同じ並び。控えで見られるもの（ホーム・カレンダー・案件・ファイル）だけ押せる。ほかは暗くして、押すと「ネットがないと使えません」
   const NI = {
@@ -253,7 +256,7 @@
     const u = URL.createObjectURL(f.blob), v = document.createElement('div'); v.id = 'offv';
     const img = /^image\//.test(f.mime || f.blob.type);
     v.innerHTML = '<div class="vh"><span class="lk" id="offvx" style="color:#0a84ff">閉じる</span><b>' + esc(f.name) + '</b><a class="lk" style="color:#0a84ff" href="' + u + '" download="' + esc(f.name) + '">保存</a></div>' + (img ? '<img src="' + u + '" alt="">' : '<iframe src="' + u + '"></iframe>');
-    document.body.appendChild(v); document.getElementById('offvx').onclick = () => { v.remove(); URL.revokeObjectURL(u); };
+    document.body.appendChild(v); document.getElementById('offvx').onclick = () => { v.remove(); URL.revokeObjectURL(u); const a = AFTER; AFTER = null; if (a) a(); };
   }
 
   // ===== いつ出すか =====
@@ -265,6 +268,7 @@
     setTimeout(() => { if (READY || el.classList.contains('on')) return; kvGet('pack').then(p => { if (p && !READY) show('遅い'); }).catch(() => { }); }, 12000);
   }
   window.addEventListener('offline', () => { if (!el.classList.contains('on')) bar.classList.add('on'); });
-  window.addEventListener('online', () => { bar.classList.remove('on'); if (el.classList.contains('on')) { V.why = '遅い'; draw(); } }); // 読んでいる途中で勝手に開き直さない。上の「つなぎ直す」で開く
+  // 圏外で出したあと電波が戻ったら、押さなくてもつなぎ直す（2026-11-28 天田さん「押さなくても繋げたらなってほしい」）。ファイルを見ている途中だけ、閉じてから
+  window.addEventListener('online', () => { bar.classList.remove('on'); if (!el.classList.contains('on')) return; if (READY) whenFree(hide); else if (V.why === '圏外') whenFree(() => location.reload()); });
   window.SWOFF = { onMsg, start, show }; // show：確かめる用（ネットがあっても控えを出す）
 })();
