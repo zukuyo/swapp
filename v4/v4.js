@@ -226,7 +226,7 @@ window.V4 = (function () {
     if (W.off) return false;
     K = lsGet('k'); if (!K) return false;
     if (lsGet('v4lag') && lsGet('v4lag') === lsGet('v4build')) { // 束が追いついていない：今回は v3。追いついたかは裏で見る
-      latest().then(l => { if (l.b === lsGet('v4lag')) { lsSet('v4lag', ''); netBin(l).catch(() => { }); } }).catch(() => { });
+      latest().then(l => { if (Number(l.b) >= Number(lsGet('v4lag'))) { lsSet('v4lag', ''); netBin(l).catch(() => { }); } }).catch(() => { }); /* 版は日時の番号なので、同じか新しい束が出ていれば戻す（2026-11-28 ぴったり同じを待っていて、公開が続くと v3 のままになった） */
       W.off = true; return false;
     }
     document.getElementById('gate').classList.remove('on');
