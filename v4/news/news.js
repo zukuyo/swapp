@@ -7,6 +7,7 @@
     document.getElementById('swnTr').style.transform = 'translateX(' + (-100 * I) + '%)';
     [].forEach.call(document.querySelectorAll('#swnD i'), function (e, i) { e.className = i === I ? 'on' : ''; });
     document.getElementById('swnP').disabled = I === 0;
+    var sn = document.getElementById('swnS'), last = I === 2; sn.hidden = !last; document.getElementById('swnD').style.display = last ? 'none' : '';
     var n = document.getElementById('swnN');
     if (I === 2) { n.className = 'go'; n.textContent = 'はじめる'; n.onclick = swnClose; }
     else { n.className = 'nv'; n.innerHTML = '<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>'; n.onclick = function () { swnGo(1); }; }
