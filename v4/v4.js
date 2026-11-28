@@ -29,7 +29,7 @@ window.V4 = (function () {
         .catch(e => { CF.down = Date.now() + 60000; console.warn('Cloudflare', e); W.call0(fn, args, s, f, u); });
       return;
     }
-    if (!RO.includes(fn)) { CF.dirty = Date.now() + 90000; CF.dirtyBy = fn; } // 書いた直後の90秒は Google から読む（自分の操作をすぐ見せる。Cloudflare に写るのは最大1分ほどあと）
+    if (WRITES.includes(fn)) { CF.dirty = Date.now() + 90000; CF.dirtyBy = fn; } // 書いた直後の90秒は Google から読む（自分の操作をすぐ見せる。Cloudflare に写るのは最大1分ほどあと）
     W.call0(fn, args, s, f, u);
   };
   W.call0 = function (fn, args, s, f, u) {
@@ -169,6 +169,11 @@ window.V4 = (function () {
     /* 自分の画面の中だけで済む書き込み（既読・設定・並び順・知らせの既読など）は、書いたあとも Cloudflare から読んでよい。
        2026-11-29：案件を開くたびの既読（setSeen）で90秒ずっと Google から読み、知らせ係の知らせも止まっていた */
     'setSeen', 'setPrefs', 'setFileOrder', 'tblSet', 'setMemoLen', 'setSchFill', 'setSchMap', 'setMemoOwn', 'popDone', 'popAct', 'askAnswer', 'siteNotified']);
+  /* 書いたあと90秒は Google から読む操作（共有の一覧・案件を変えるもの）。2026-11-29：前は「読む以外は全部」としていて、読むだけの cmtList などでも知らせが止まった。
+     ここにない書き込みは、自宅Mac が5〜10秒で Cloudflare に写すので、自分の操作が見えるまで数秒待つだけ */
+  const WRITES = ['saveField', 'saveStatusAs', 'decideProposal', 'lagDismiss', 'saveMemo', 'deleteMemo', 'setAssignee', 'setFlag', 'setNoReply', 'setTask', 'taskHand', 'addIdea', 'setIdea',
+    'setCaseDate', 'saveSite', 'siteShare', 'saveHand', 'saveRel', 'setCompany', 'addCase', 'caseMerge', 'msgMove', 'msgCopy', 'umAssign', 'umAssignMsgs', 'umNewCase', 'umNote', 'umAiUndo',
+    'cmtAdd', 'cmtDel', 'addFeedback', 'fbDecide', 'replyFeedback', 'schedOp', 'quoteSave', 'sendReply', 'chSend', 'inboxSend', 'cancelPlan', 'caseFileAdd', 'caseAlbumAdd', 'peopleOp', 'setNoGon', 'keepOff'];
   const CF = { st: null, keys: {}, cases: {}, dirty: 0, down: 0 };
   W.cf = CF; // 調べる用（診断・内蔵ブラウザから中の様子を見る）
   const CF_FRESH = 180000; // 最後に写してから3分を超えたら古いとみなす（写すのはふだん45〜60秒ごと）
