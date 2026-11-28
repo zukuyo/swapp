@@ -29,7 +29,7 @@ window.V4 = (function () {
         .catch(e => { CF.down = Date.now() + 60000; console.warn('Cloudflare', e); W.call0(fn, args, s, f, u); });
       return;
     }
-    if (!RO.includes(fn)) CF.dirty = Date.now() + 90000; // 書いた直後の90秒は Google から読む（自分の操作をすぐ見せる。Cloudflare に写るのは最大1分ほどあと）
+    if (!RO.includes(fn)) { CF.dirty = Date.now() + 90000; CF.dirtyBy = fn; } // 書いた直後の90秒は Google から読む（自分の操作をすぐ見せる。Cloudflare に写るのは最大1分ほどあと）
     W.call0(fn, args, s, f, u);
   };
   W.call0 = function (fn, args, s, f, u) {
@@ -170,6 +170,7 @@ window.V4 = (function () {
        2026-11-29：案件を開くたびの既読（setSeen）で90秒ずっと Google から読み、知らせ係の知らせも止まっていた */
     'setSeen', 'setPrefs', 'setFileOrder', 'tblSet', 'setMemoLen', 'setSchFill', 'setSchMap', 'setMemoOwn', 'popDone', 'popAct', 'askAnswer', 'siteNotified']);
   const CF = { st: null, keys: {}, cases: {}, dirty: 0, down: 0 };
+  W.cf = CF; // 調べる用（診断・内蔵ブラウザから中の様子を見る）
   const CF_FRESH = 180000; // 最後に写してから3分を超えたら古いとみなす（写すのはふだん45〜60秒ごと）
   const cfOk = () => lsGet('v4ks') && lsGet('v4ku') && Date.now() > CF.dirty && Date.now() > CF.down;
   const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
