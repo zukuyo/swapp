@@ -167,6 +167,7 @@ window.V4 = (function () {
   const CF_READ = ['listCases', 'listAuto', 'getCase', 'getCases', 'prefetch', 'pulse'];
   const RO = CF_READ.concat(['schedRange', 'uiPart', 'quoteList', 'replyChannels', 'takeNotices', 'searchLogs', 'inboxList', 'inboxThread', 'offlinePack', 'filesAll', 'logOpen', 'logErr', 'logTiming', 'ping', 'fixSeenLog']);
   const CF = { st: null, keys: {}, cases: {}, dirty: 0, down: 0 };
+  const CF_FRESH = 180000; // 最後に写してから3分を超えたら古いとみなす（写すのはふだん45〜60秒ごと）
   const cfOk = () => lsGet('v4ks') && lsGet('v4ku') && Date.now() > CF.dirty && Date.now() > CF.down;
   const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
   async function unseal(s, h) {
@@ -187,6 +188,7 @@ window.V4 = (function () {
   async function cfSync() {
     const ks = lsGet('v4ks'), ku = lsGet('v4ku'); if (!ks || !ku) throw new Error('鍵がありません');
     const st = cfLoad(), j = await cfPost('/sync', { since: st.v }, 4000);
+    if (!(Date.now() - (j.at || 0) < CF_FRESH)) throw new Error('Cloudflare の写しが古い'); // 自宅Mac が止まっているかもしれない：古い中身を最新として見せず Google から読む
     await Promise.all(j.items.map(async it => {
       const k = it.k;
       if (k === 'LM') st.LM = await unseal(it.data, ks);
@@ -205,7 +207,7 @@ window.V4 = (function () {
   }
   async function cfRoute(fn, args) {
     if (fn === 'listCases' || fn === 'listAuto') return await cfSync();
-    if (fn === 'pulse') { const j = await cfPost('/ver', {}, 3000); const lm = (CF.st && CF.st.LM) || {}; return 'cf' + j.v + '\t' + (lm.build || '') + '\t'; }
+    if (fn === 'pulse') { const j = await cfPost('/ver', {}, 3000); if (!(Date.now() - (j.at || 0) < CF_FRESH)) return undefined; const lm = (CF.st && CF.st.LM) || {}; return 'cf' + j.v + '\t' + (lm.build || '') + '\t' + (lm.force || ''); }
     if (fn === 'prefetch') { const ids = (args[0] || []).map(x => String(x).split('|')[0]); cfCases(ids).catch(() => { }); return true; }
     if (fn === 'getCase') {
       const id = String(args[0] || ''), ver = String(args[1] || ''); delete CF.cases[id]; await cfCases([id]);
