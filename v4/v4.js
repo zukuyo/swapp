@@ -8,6 +8,17 @@ window.V4 = (function () {
   const BOOT_FN = ['listCases', 'listAuto', 'refreshAll'];
   const W = window.SW4 = { src: null, org: '', q: [], pend: {}, id: 0, tb: 0, tr: 0, tf: 0, cached: false, started: false, off: false };
   let K = '', br = null;
+  // どこで止まったかを画面に出す（2026-11-28 iPhoneのSafariでロード画面のまま止まり、Googleに何も届いていなかったため）
+  W.stage = '始め'; const stg = s => { W.stage = s; };
+  window.addEventListener('error', e => { stg('エラー：' + (e.message || e)); });
+  window.addEventListener('unhandledrejection', e => { stg('エラー：' + ((e.reason && e.reason.message) || e.reason)); });
+  function showStage() {
+    if (W.tr || W.off) return; const sp = document.getElementById('sp'); if (!sp) return;
+    let x = document.getElementById('v4st'); if (!x) { x = document.createElement('div'); x.id = 'v4st'; x.style.cssText = 'position:absolute;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));text-align:center;color:#8e8e93;font-size:12px;line-height:1.5;-webkit-user-select:text;user-select:text'; sp.appendChild(x); }
+    x.textContent = '試し版：' + W.stage + '（つなぎ ' + (W.src ? '済' : 'まだ') + '・控え ' + (lsGet('v4bin') ? 'あり' : 'なし') + '・' + Math.round(performance.now() / 1000) + '秒）';
+    setTimeout(showStage, 1000);
+  }
+  setTimeout(showStage, 10000);
   const lsGet = k => { try { return localStorage.getItem('swapp.' + k) || ''; } catch (e) { return ''; } };
   const lsSet = (k, v) => { try { v ? localStorage.setItem('swapp.' + k, v) : localStorage.removeItem('swapp.' + k); } catch (e) { } };
 
@@ -34,7 +45,7 @@ window.V4 = (function () {
   };
   function bridge() {
     if (br) return;
-    br = document.createElement('iframe'); br.style.display = 'none'; br.title = 'つなぎ';
+    stg('つなぎを開いています'); br = document.createElement('iframe'); br.style.display = 'none'; br.title = 'つなぎ';
     br.src = EXEC + '?bridge=1&k=' + encodeURIComponent(K) + '&d=' + encodeURIComponent(dev) + '&ua=' + encodeURIComponent(devName());
     document.body.appendChild(br);
     setTimeout(() => { if (W.src) return; W.q.splice(0).forEach(m => W.done({ id: m.id, ok: 0, m: 'NetworkError: つなぎが答えません' })); }, 25000);
@@ -42,7 +53,7 @@ window.V4 = (function () {
   window.addEventListener('message', e => {
     const d = e.data; if (!GORG.test(e.origin) || !d || typeof d !== 'object') return;
     if (d.t === 'swapp:bridge') {
-      if (!d.ok) { lsSet('v4ak', ''); toV3(d.why === 'key' ? '合言葉が違います' : ''); return; }
+      stg(d.ok ? 'つながった' : 'つなぎが断った（' + d.why + '）'); if (!d.ok) { lsSet('v4ak', ''); toV3(d.why === 'key' ? '合言葉が違います' : ''); return; }
       W.src = e.source; W.org = e.origin; W.tb = Math.round(performance.now());
       lsSet('v4ak', d.ak); lsSet('v4who', d.who); lsSet('v4build', d.build); lsSet('v4cw', d.cw ? '1' : ''); lsSet('v4cs', d.cs ? '1' : '');
       if (d.boot && d.boot.list) { saveBoot(d.boot); if (!d.boot.stale) { W.early = d.boot; setTimeout(() => { W.early = null; }, 15000); } }
@@ -89,11 +100,11 @@ window.V4 = (function () {
     if (fromCache && (!buf || !boot)) return; // 取っておいた分がないときは、受け渡し役を待つ
     if (W.started) return; W.started = true; W.cached = !!(fromCache && buf && boot);
     try {
-      if (!buf) buf = await netBin();
-      let html; try { html = await openBin(buf, ak); } catch (e) { buf = await netBin(); html = await openBin(buf, ak); }
-      if (!boot) boot = await new Promise((ok, ng) => W.call('listCases', [{ __k: K, __d: dev }], ok, ng));
-      render(html, boot);
-    } catch (e) { console.error(e); toV3(''); }
+      stg('束を取っています'); if (!buf) buf = await netBin();
+      stg('束を開いています'); let html; try { html = await openBin(buf, ak); } catch (e) { buf = await netBin(); html = await openBin(buf, ak); }
+      stg('一覧を待っています'); if (!boot) boot = await new Promise((ok, ng) => W.call('listCases', [{ __k: K, __d: dev }], ok, ng));
+      stg('画面を描いています'); render(html, boot);
+    } catch (e) { console.error(e); stg('エラー：' + (e && e.message || e)); W.started = false; setTimeout(() => { if (!W.tr) toV3(''); }, 20000); }
   }
   function render(html, boot) {
     const b = Object.assign({}, boot); if (W.cached) b.stale = 1;
