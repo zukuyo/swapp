@@ -1,12 +1,13 @@
-<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>診断2</title>
-<style>body{background:#1c1c1e;color:#f2f2f7;font:13px/1.6 -apple-system,sans-serif;padding:16px}iframe{border:1px solid #555;background:#fff}</style></head><body><div id="o"></div>
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>診断</title>
+<style>body{background:#1c1c1e;color:#f2f2f7;font:13px/1.6 -apple-system,sans-serif;padding:16px}</style></head><body><div id="o"></div>
 <script>
-const o=document.getElementById('o'),L=t=>{const d=document.createElement('div');d.textContent=t;o.appendChild(d);},t0=performance.now();
-const g=k=>{try{return localStorage.getItem('swapp.'+k)||''}catch(e){return ''}};
-const EXEC='https://script.google.com/macros/s/AKfycbxSB-wZdgOUeokFqoIKT4RjKyN3-roupbiJlbRINV0bdzMdXbmB8L8fuChSce2Jrvnd/exec';
-window.addEventListener('message',e=>{const d=e.data;L(Math.round(performance.now()-t0)+'ms 知らせ：'+e.origin.replace('https://','').slice(-40)+' '+(typeof d==='string'?d.slice(0,30):(d&&d.t)+' ok='+(d&&d.ok)+(d&&d.why?' 理由='+d.why:'')));});
-function mk(label,css,extra){const f=document.createElement('iframe');f.style.cssText=css;f.src=EXEC+'?'+(extra||'bridge=1')+'&k='+encodeURIComponent(g('k'))+'&d='+encodeURIComponent(g('d'))+'&ua=diag-'+label;f.onload=()=>L(Math.round(performance.now()-t0)+'ms 窓が読み込み終わり：'+label);document.body.appendChild(f);L('窓を開いた：'+label);}
-mk('見える','width:300px;height:120px');
-mk('隠す','display:none');
-setTimeout(()=>L('—— 30秒 ——'),30000);
+const o=document.getElementById('o'),L=t=>{const d=document.createElement('div');d.textContent=t;o.appendChild(d);};
+const g=k=>{try{return localStorage.getItem('swapp.'+k)||''}catch(e){return 'ERR'}};
+(async()=>{
+ ['k','d','v4ak','v4who','v4build','v4bin','v4lag','v4cw'].forEach(k=>{const v=g(k);L(k+'：'+(v?(/build|bin|lag|who|cw/.test(k)?v:'あり'+v.length):'なし'));});
+ L('v4boot：'+Math.round(g('v4boot').length/1024)+'KB');
+ try{const c=await caches.open('swapp-v4');const m=await c.match('app.bin');L('束の控え：'+(m?'あり':'なし'));}catch(e){L('caches：'+e);}
+ try{const l=await (await fetch('latest.json?t='+Date.now(),{cache:'no-store'})).json();L('latest：'+l.b);}catch(e){L('latest：'+e);}
+ try{const r=await navigator.serviceWorker.getRegistrations();L('SW：'+r.length);}catch(e){}
+})();
 </script></body></html>
