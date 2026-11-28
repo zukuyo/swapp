@@ -178,7 +178,7 @@
     return os + (br ? '・' + br : '') + home;
   }
   // 起動画面を消す。アプリから合図が来たとき・合言葉の画面を出すとき。合図が来ない古い版でも閉じ込めないよう、枠の読み込みから15秒で消す
-  function spOff() { const s = document.getElementById('sp'), b = document.getElementById('spbar'); if (s) s.remove(); if (b && !b.classList.contains('done')) { b.classList.add('done'); setTimeout(() => b.remove(), 450); } } /* 準備ができた瞬間に消す（フェードも待ちもなし。2026-11-26 天田さん「遅くなることは論外」）。上の線だけは画面の邪魔をしないので最後まで伸びて消える */ /* 2026-11-26：線を最後まで伸ばし、アイコンが大きくなりながら消える */
+  function spOff() { try { performance.mark("sp-off"); requestAnimationFrame(() => requestAnimationFrame(() => performance.mark("sp-paint"))); } catch (e) { } const s = document.getElementById('sp'), b = document.getElementById('spbar'); if (s) s.remove(); if (b && !b.classList.contains('done')) { b.classList.add('done'); setTimeout(() => b.remove(), 450); } } /* 準備ができた瞬間に消す（フェードも待ちもなし。2026-11-26 天田さん「遅くなることは論外」）。上の線だけは画面の邪魔をしないので最後まで伸びて消える */ /* 2026-11-26：線を最後まで伸ばし、アイコンが大きくなりながら消える */
   function gate(msg) {
     spOff();
     const f = document.getElementById('app'); if (f) f.remove();
