@@ -165,7 +165,10 @@ window.V4 = (function () {
   // 自宅Mac（cfsync.mjs）が Google から写して暗号にしたもの。共通の鍵（v4ks）と自分の鍵（v4ku）は受け渡し役が渡す
   const API = 'https://swapp-api.laude-master.workers.dev';
   const CF_READ = ['listCases', 'listAuto', 'getCase', 'getCases', 'prefetch', 'pulse'];
-  const RO = CF_READ.concat(['schedRange', 'uiPart', 'quoteList', 'replyChannels', 'takeNotices', 'searchLogs', 'inboxList', 'inboxThread', 'offlinePack', 'filesAll', 'logOpen', 'logErr', 'logTiming', 'ping', 'fixSeenLog']);
+  const RO = CF_READ.concat(['schedRange', 'uiPart', 'quoteList', 'replyChannels', 'takeNotices', 'searchLogs', 'inboxList', 'inboxThread', 'offlinePack', 'filesAll', 'logOpen', 'logErr', 'logTiming', 'ping', 'fixSeenLog',
+    /* 自分の画面の中だけで済む書き込み（既読・設定・並び順・知らせの既読など）は、書いたあとも Cloudflare から読んでよい。
+       2026-11-29：案件を開くたびの既読（setSeen）で90秒ずっと Google から読み、知らせ係の知らせも止まっていた */
+    'setSeen', 'setPrefs', 'setFileOrder', 'tblSet', 'setMemoLen', 'setSchFill', 'setSchMap', 'setMemoOwn', 'popDone', 'popAct', 'askAnswer', 'siteNotified']);
   const CF = { st: null, keys: {}, cases: {}, dirty: 0, down: 0 };
   const CF_FRESH = 180000; // 最後に写してから3分を超えたら古いとみなす（写すのはふだん45〜60秒ごと）
   const cfOk = () => lsGet('v4ks') && lsGet('v4ku') && Date.now() > CF.dirty && Date.now() > CF.down;
