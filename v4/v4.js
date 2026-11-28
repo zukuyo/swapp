@@ -4,6 +4,10 @@
    開き方：端末に取っておいた画面の束（暗号）と前回の一覧ですぐ描く。Googleは見えない枠の受け渡し役（doGet ?bridge=1）だけで、画面の google.script.* をそこへ流す。
    v3 に回すとき：合言葉がない・許可されていない端末・束がGoogleの版に追いついていない（自宅Macの自動修正が出したあと、メインMacで束を作るまで） */
 window.V4 = (function () {
+  /* v3 の入口からも読み込めるように（梅木さん・畑山さんへの展開の準備。2026-11-29）：束などの置き場所は v4.js のある場所を基準にする。
+     v3 の入口では、Google の設定 V4_USERS に名前がある人だけ新しい仕組みで開く（印 swapp.v4on。今の形で開いたときに Google が教える） */
+  const BASE = (() => { try { return new URL('./', document.currentScript.src).href; } catch (e) { return './'; } })();
+  const IS_V3 = !/\/v4\//.test(location.pathname);
   const GORG = /^https:\/\/[a-z0-9-]+-script\.googleusercontent\.com$/;
   const BOOT_FN = ['listCases', 'listAuto', 'refreshAll'];
   const W = window.SW4 = { src: null, org: '', q: [], pend: {}, id: 0, tb: 0, tr: 0, tf: 0, cached: false, started: false, off: false };
@@ -60,10 +64,11 @@ window.V4 = (function () {
     setTimeout(() => { if (W.src) return; W.q.splice(0).forEach(m => W.done({ id: m.id, ok: 0, m: 'NetworkError: つなぎが答えません' })); }, 25000);
   }
   window.addEventListener('message', e => {
+    if (GORG.test(e.origin) && typeof e.data === 'string' && /^swapp:v4on:[01]$/.test(e.data)) { lsSet('v4on', e.data.slice(-1) === '1' ? '1' : ''); return; } // 今の形で開いたときに Google が「この人は新しい仕組み」と教える
     const d = e.data; if (!GORG.test(e.origin) || !d || typeof d !== 'object') return;
     if (d.t === 'swapp:bridge') {
       stg(d.ok ? 'つながった' : 'つなぎが断った（' + d.why + '）'); if (!d.ok) { lsSet('v4ak', ''); toV3(d.why === 'key' ? '合言葉が違います' : ''); return; }
-      W.src = e.source; W.org = e.origin; W.tb = Math.round(performance.now());
+      W.src = e.source; W.org = e.origin; W.tb = Math.round(performance.now()); if (IS_V3 && d.v4on === false) lsSet('v4on', ''); // 一覧から外された人は、次から今の形で開く
       lsSet('v4ak', d.ak); lsSet('v4who', d.who); lsSet('v4build', d.build); lsSet('v4cw', d.cw ? '1' : ''); if (d.ks) { lsSet('v4ks', d.ks); lsSet('v4ku', d.ku); } lsSet('v4cs', d.cs ? '1' : '');
       if (d.boot && d.boot.list) { saveBoot(d.boot); if (!d.boot.stale) { W.early = d.boot; setTimeout(() => { W.early = null; }, 15000); } }
       W.q.splice(0).forEach(m => { if (W.early && BOOT_FN.includes(m.fn) && m.fn !== 'refreshAll') { const r = W.early; W.early = null; W.done({ id: m.id, ok: 1, r }); } else W.post(m); });
@@ -89,10 +94,10 @@ window.V4 = (function () {
     return await new Response(new Blob([gz]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
   }
   async function cachedBin() { try { const c = await caches.open('swapp-v4'); const r = await c.match('app.bin'); return r ? await r.arrayBuffer() : null; } catch (e) { return null; } }
-  const latest = async () => (await fetch('latest.json?t=' + Date.now(), { cache: 'no-store' })).json();
+  const latest = async () => (await fetch(BASE + 'latest.json?t=' + Date.now(), { cache: 'no-store' })).json();
   async function netBin(l) {
     l = l || await latest();
-    const r = await fetch(l.f); if (!r.ok) throw new Error('束がありません');
+    const r = await fetch(BASE + l.f); if (!r.ok) throw new Error('束がありません');
     const buf = await r.arrayBuffer();
     try { const c = await caches.open('swapp-v4'); await c.put('app.bin', new Response(buf)); lsSet('v4bin', l.b); } catch (e) { }
     return buf;
@@ -251,6 +256,7 @@ window.V4 = (function () {
   // v3 の open() の先頭から呼ばれる。true＝ここで開いた
   function openV4() {
     if (W.off) return false;
+    if (IS_V3 && lsGet('v4on') !== '1') { W.off = true; return false; } // v3 の入口：名前のない人は今の形のまま
     K = lsGet('k'); if (!K) return false;
     if (lsGet('v4lag') && lsGet('v4lag') === lsGet('v4build')) { // 束が追いついていない：今回は v3。追いついたかは裏で見る
       latest().then(l => { if (Number(l.b) >= Number(lsGet('v4lag'))) { lsSet('v4lag', ''); netBin(l).catch(() => { }); } }).catch(() => { }); /* 版は日時の番号なので、同じか新しい束が出ていれば戻す（2026-11-28 ぴったり同じを待っていて、公開が続くと v3 のままになった） */
