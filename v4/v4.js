@@ -24,6 +24,15 @@ window.V4 = (function () {
 
   // ===== 受け渡し役 =====
   W.call = function (fn, args, s, f, u) {
+    if (CF_READ.includes(fn) && cfOk()) { // スピード計画フェーズ2：読む呼び出しは Cloudflare から。読めなければ Google へ
+      cfRoute(fn, args).then(r => { if (r === undefined) return W.call0(fn, args, s, f, u); if (BOOT_FN.includes(fn) && W.tr && !W.tf) { W.tf = Math.round(performance.now()); logFresh(); } if (s) try { s(r, u); } catch (e) { console.error(e); } })
+        .catch(e => { CF.down = Date.now() + 60000; console.warn('Cloudflare', e); W.call0(fn, args, s, f, u); });
+      return;
+    }
+    if (!RO.includes(fn)) CF.dirty = Date.now() + 90000; // 書いた直後の90秒は Google から読む（自分の操作をすぐ見せる。Cloudflare に写るのは最大1分ほどあと）
+    W.call0(fn, args, s, f, u);
+  };
+  W.call0 = function (fn, args, s, f, u) {
     const id = ++W.id; W.pend[id] = { s, f, u, fn };
     // 受け渡し役が一緒に持ってきた最新の一覧があれば、開いた直後の読み直しはそれで答える（往復1回ぶん早い）
     if (W.early && BOOT_FN.includes(fn) && fn !== 'refreshAll') { const r = W.early; W.early = null; setTimeout(() => W.done({ id, ok: 1, r }), 0); return; }
@@ -55,7 +64,7 @@ window.V4 = (function () {
     if (d.t === 'swapp:bridge') {
       stg(d.ok ? 'つながった' : 'つなぎが断った（' + d.why + '）'); if (!d.ok) { lsSet('v4ak', ''); toV3(d.why === 'key' ? '合言葉が違います' : ''); return; }
       W.src = e.source; W.org = e.origin; W.tb = Math.round(performance.now());
-      lsSet('v4ak', d.ak); lsSet('v4who', d.who); lsSet('v4build', d.build); lsSet('v4cw', d.cw ? '1' : ''); lsSet('v4cs', d.cs ? '1' : '');
+      lsSet('v4ak', d.ak); lsSet('v4who', d.who); lsSet('v4build', d.build); lsSet('v4cw', d.cw ? '1' : ''); if (d.ks) { lsSet('v4ks', d.ks); lsSet('v4ku', d.ku); } lsSet('v4cs', d.cs ? '1' : '');
       if (d.boot && d.boot.list) { saveBoot(d.boot); if (!d.boot.stale) { W.early = d.boot; setTimeout(() => { W.early = null; }, 15000); } }
       W.q.splice(0).forEach(m => { if (W.early && BOOT_FN.includes(m.fn) && m.fn !== 'refreshAll') { const r = W.early; W.early = null; W.done({ id: m.id, ok: 1, r }); } else W.post(m); });
       checkBin(d.build);
@@ -96,13 +105,14 @@ window.V4 = (function () {
 
   async function start(fromCache) {
     if (W.started) return; const ak = lsGet('v4ak'); if (!ak) return;
-    let buf = await cachedBin(), boot = loadBoot();
-    if (fromCache && (!buf || !boot)) return; // 取っておいた分がないときは、受け渡し役を待つ
-    if (W.started) return; W.started = true; W.cached = !!(fromCache && buf && boot);
+    let buf = await cachedBin(), boot = null;
+    // 2026-11-28 天田さん「最新じゃないものだったら逆に見せない方がマシ」：Cloudflare から最新の一覧を取ってから出す。取れなければ受け渡し役（Google）の一覧を待つ
+    if (fromCache) { if (!buf) return; try { stg('最新の一覧を取っています'); boot = await cfSync(); W.tcf = Math.round(performance.now()); } catch (e) { console.warn('Cloudflare', e); return; } }
+    if (W.started) return; W.started = true; W.cached = false;
     try {
       stg('束を取っています'); if (!buf) buf = await netBin();
       stg('束を開いています'); let html; try { html = await openBin(buf, ak); } catch (e) { buf = await netBin(); html = await openBin(buf, ak); }
-      stg('一覧を待っています'); if (!boot) boot = await new Promise((ok, ng) => W.call('listCases', [{ __k: K, __d: dev }], ok, ng));
+      stg('一覧を待っています'); if (!boot) { try { boot = await cfSync(); } catch (e) { boot = await new Promise((ok, ng) => W.call0('listCases', [{ __k: K, __d: dev }], ok, ng)); } }
       stg('画面を描いています'); render(html, boot);
     } catch (e) { console.error(e); stg('エラー：' + (e && e.message || e)); W.started = false; setTimeout(() => { if (!W.tr) toV3(''); }, 20000); }
   }
@@ -148,7 +158,65 @@ window.V4 = (function () {
     } };
   }
   function logFresh() {
-    W.call('logTiming', [devName(), { v4: 1, cached: W.cached ? 1 : 0, bridge: W.tb, ready: W.tr, fresh: W.tf, o: Math.round(performance.timeOrigin), w: innerWidth }, { __k: K, __d: dev }], null, null);
+    W.call('logTiming', [devName(), { v4: 1, cf: W.tcf || 0, cached: W.cached ? 1 : 0, bridge: W.tb, ready: W.tr, fresh: W.tf, o: Math.round(performance.timeOrigin), w: innerWidth }, { __k: K, __d: dev }], null, null);
+  }
+
+  // ===== スピード計画フェーズ2（2026-11-28。母艦 01_経営/SWAPP_スピード計画.md）：一覧・案件の中身は Cloudflare に暗号で置いてある =====
+  // 自宅Mac（cfsync.mjs）が Google から写して暗号にしたもの。共通の鍵（v4ks）と自分の鍵（v4ku）は受け渡し役が渡す
+  const API = 'https://swapp-api.laude-master.workers.dev';
+  const CF_READ = ['listCases', 'listAuto', 'getCase', 'getCases', 'prefetch', 'pulse'];
+  const RO = CF_READ.concat(['schedRange', 'uiPart', 'quoteList', 'replyChannels', 'takeNotices', 'searchLogs', 'inboxList', 'inboxThread', 'offlinePack', 'filesAll', 'logOpen', 'logErr', 'logTiming', 'ping', 'fixSeenLog']);
+  const CF = { st: null, keys: {}, cases: {}, dirty: 0, down: 0 };
+  const cfOk = () => lsGet('v4ks') && lsGet('v4ku') && Date.now() > CF.dirty && Date.now() > CF.down;
+  const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+  async function unseal(s, h) {
+    const key = CF.keys[h] || (CF.keys[h] = await crypto.subtle.importKey('raw', hex(h), 'AES-GCM', false, ['decrypt']));
+    const b = b64(s), gz = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b.slice(0, 12) }, key, b.slice(12));
+    return JSON.parse(await new Response(new Blob([gz]).stream().pipeThrough(new DecompressionStream('gzip'))).text());
+  }
+  async function cfPost(path, body, ms) { // 本文は文字（text/plain）で送る：前もっての確認（preflight）の往復を省く
+    const ac = new AbortController(), tm = setTimeout(() => ac.abort(), ms || 4000);
+    try { const r = await fetch(API + path, { method: 'POST', body: JSON.stringify(Object.assign({}, body, { k: K, d: dev })), signal: ac.signal }); const j = await r.json(); if (!j.ok) throw new Error('Cloudflare：' + (j.error || r.status)); return j; } finally { clearTimeout(tm); }
+  }
+  function cfLoad() {
+    if (!CF.st) { try { CF.st = JSON.parse(localStorage.getItem('swapp.cfst') || 'null'); } catch (e) { CF.st = null; } }
+    if (!CF.st || CF.st.who !== lsGet('v4who')) CF.st = { v: 0, L: {}, LM: null, U: null, who: lsGet('v4who') };
+    return CF.st;
+  }
+  function cfSave() { setTimeout(() => { try { localStorage.setItem('swapp.cfst', JSON.stringify(CF.st)); } catch (e) { } }, 0); }
+  async function cfSync() {
+    const ks = lsGet('v4ks'), ku = lsGet('v4ku'); if (!ks || !ku) throw new Error('鍵がありません');
+    const st = cfLoad(), j = await cfPost('/sync', { since: st.v }, 4000);
+    await Promise.all(j.items.map(async it => {
+      const k = it.k;
+      if (k === 'LM') st.LM = await unseal(it.data, ks);
+      else if (k.indexOf('L:') === 0) { if (it.data) st.L[k.slice(2)] = await unseal(it.data, ks); else delete st.L[k.slice(2)]; }
+      else if (k.indexOf('U:') === 0 && it.data) st.U = await unseal(it.data, ku);
+    }));
+    st.v = j.v; if (j.items.length) cfSave();
+    if (!st.LM || !st.U) throw new Error('一覧がまだありません');
+    const lm = st.LM;
+    return { at: lm.at, ts: lm.ts, list: lm.order.map(id => st.L[id]).filter(Boolean), marks: lm.marks, v2: Object.assign({}, lm.v2, { fb: st.U.fb }), members: lm.members, mmails: lm.mmails, seen: st.U.seen, prefs: st.U.prefs };
+  }
+  // 案件の中身：画面が欲しい版（ver）と同じものがあれば返す。なければ undefined（Google へ）
+  async function cfCases(ids) {
+    const want = ids.filter(id => !CF.cases[id]);
+    if (want.length) { const j = await cfPost('/cases', { ids: want.slice(0, 40) }, 4000); await Promise.all(j.items.map(async it => { if (it.data) CF.cases[it.k.slice(2)] = await unseal(it.data, lsGet('v4ks')); })); }
+  }
+  async function cfRoute(fn, args) {
+    if (fn === 'listCases' || fn === 'listAuto') return await cfSync();
+    if (fn === 'pulse') { const j = await cfPost('/ver', {}, 3000); const lm = (CF.st && CF.st.LM) || {}; return 'cf' + j.v + '\t' + (lm.build || '') + '\t'; }
+    if (fn === 'prefetch') { const ids = (args[0] || []).map(x => String(x).split('|')[0]); cfCases(ids).catch(() => { }); return true; }
+    if (fn === 'getCase') {
+      const id = String(args[0] || ''), ver = String(args[1] || ''); delete CF.cases[id]; await cfCases([id]);
+      const o = CF.cases[id]; return o && (!ver || o.v === ver) ? o.d : undefined;
+    }
+    if (fn === 'getCases') {
+      const l = (args[0] || []).map(x => String(x).split('|')); await cfCases(l.map(x => x[0]));
+      const out = l.map(([id, ver]) => { const o = CF.cases[id]; return o && (!ver || o.v === ver) ? { id, v: ver || '', d: o.d, chan: o.chan } : null; });
+      return out.every(x => x === null) ? undefined : out;
+    }
+    return undefined;
   }
 
   // v3 の open() の先頭から呼ばれる。true＝ここで開いた
